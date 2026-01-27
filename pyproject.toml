@@ -1,5 +1,5 @@
 [project]
-name = "s8"
+name = "s9"
 version = "0.1.0"
 description = ""
 authors = [
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "s8", from = "src"}]
+packages = [{include = "s9", from = "src"}]
 
 [[tool.poetry.source]]
 name = "torch_cu130"

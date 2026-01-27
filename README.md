@@ -1,10 +1,10 @@
-# S8: Complex-valued Multidimensional SSM with Non-learnable Preprocessing
+# S9: Complex-valued Multidimensional SSM with Non-learnable Preprocessing
 
-S8은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합하여 설계된 새로운 다차원 상태 공간 모델입니다.
-이 모델은 실수 도메인의 데이터를 복소수 도메인으로 확장하여 **위상(Phase)** 과 진폭(Amplitude) 정보를 동시에 활용합니다. 이를 위해 **Multidimensional Discrete Orthogonal Stockwell Transform (MD-DOST)** 기반의 학습되지 않는(Non-learnable) 전처리기를 도입했습니다.
+S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합하여 설계된 새로운 다차원 상태 공간 모델입니다.
+이 모델은 실수 도메인의 데이터를 복소수 도메인으로 확장하여 **위상(Phase)**과 진폭(Amplitude) 정보를 동시에 활용합니다. 이를 위해 **Multidimensional Discrete Orthogonal Stockwell Transform (MD-DOST)** 기반의 학습되지 않는(Non-learnable) 전처리기를 도입했습니다.
 
 ## 🌟 주요 특징 (Key Features)
-* **Multidimensional S8 Layer**: N차원 데이터(1D 시계열, 2D 이미지, 3D 비디오 등)들을 처리할 수 있는 일반화된 SSM 백본입니다.
+* **Multidimensional S9 Layer**: N차원 데이터(1D 시계열, 2D 이미지, 3D 비디오 등)들을 처리할 수 있는 일반화된 SSM 백본입니다.
 * **S4ND + S7 Fusion**:
     - **S4ND 구조**: 각 차원을 독립적으로 처리한 후 Outer Product를 통해 다차원 커널을 생성하여 N차원 컨볼루션을 수행합니다.
     - **S7 상태 공유**: 효율적인 파라미터 공유 및 초기화 기법을 적용하여 모델의 경량화와 안정성을 확보했습니다.
@@ -22,22 +22,22 @@ S8은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 ``` bash
 # 저장소 클론
-git clone https://github.com/Honey-Be/s8.git
-cd s8
+git clone https://github.com/Honey-Be/s9.git
+cd s9
 
 # 의존성 설치
 poetry install
 ```
 ## 🚀 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
-`S8ClassifierModelExample`은 S8 레이어를 활용한 분류 모델의 예시입니다.
+`S9ClassifierModelExample`은 S9 레이어를 활용한 분류 모델의 예시입니다.
 
 ```python
 import torch
-from s8.examples import S8ClassifierModelExample
+from s9.examples import S9ClassifierModelExample
 
 # 예: 32x32 컬러 이미지(2D)를 10개 클래스로 분류
-model = S8ClassifierModelExample(
+model = S9ClassifierModelExample(
     in_channels=3,
     d_model=64,
     n_layers=4,
@@ -51,13 +51,13 @@ logits = model(x)
 print(logits.shape) # torch.Size([2, 10])
 ```
 
-2. **S8 레이어 직접 활용 (Backbone)**
-`S8Layer`를 여러분의 모델의 백본으로 사용할 수 있습니다. 단, 입력은 복소수 텐서여야 하므로 `DOST` 전처리기와 함께 사용하는 것을 권장합니다.
+2. **S9 레이어 직접 활용 (Backbone)**
+`S9Layer`를 여러분의 모델의 백본으로 사용할 수 있습니다. 단, 입력은 복소수 텐서여야 하므로 `DOST` 전처리기와 함께 사용하는 것을 권장합니다.
 
 ```python
 import torch
-from s8.dost import DOST
-from s8.modules import S8Layer, StableModReLU
+from s9.dost import DOST
+from s9.modules import S9Layer, StableModReLU
 
 # 설정
 d_model = 64
@@ -66,7 +66,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 모듈 초기화
 dost = DOST(D=2) # 2D DOST 전처리기
-layer = S8Layer[StableModReLU]( # note: 활성화 함수 구현체 클래스를 제네릭 인자로 제공하는 것을 권장함.
+layer = S9Layer[StableModReLU]( # note: 활성화 함수 구현체 클래스를 제네릭 인자로 제공하는 것을 권장함.
     d_model=d_model,
     spatial_shapes=spatial_shape,
     gen_activation=StableModReLU, # 활성화 함수 선택

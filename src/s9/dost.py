@@ -3,7 +3,7 @@ import torch.nn as nn
 
 from functools import reduce
 
-from s8.base import NonLearnableProcessorBase
+from s9.base import NonLearnableProcessorBase
 
 from typing import override
 

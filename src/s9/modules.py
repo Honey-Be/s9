@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple, List, Literal
-from s8.base import ComplexActivationFunctionBase, COMPLEX_DTYPES_DICT
+from s9.base import ComplexActivationFunctionBase, COMPLEX_DTYPES_DICT
 
 
 class StableComplexCardioid(ComplexActivationFunctionBase):
@@ -53,9 +53,9 @@ class StableModReLU(ComplexActivationFunctionBase):
         # 3. Rescale z (위상 유지)
         return z * (act_mag / mag)
 
-class S8SSMKernel(nn.Module):
+class S9SSMKernel(nn.Module):
     """
-    The Core S8 Kernel (Complex Domain, S4ND structure, S7 State Sharing).
+    The Core S9 Kernel (Complex Domain, S4ND structure, S7 State Sharing).
     단일 차원에 대한 커널을 생성합니다.
     """
     def __init__(self, d_model: int, N: int = 64, L: int = None, dtype_idx: Literal[32, 64, 128] = 64):
@@ -98,9 +98,9 @@ class S8SSMKernel(nn.Module):
         
         return K
 
-class S8Layer[Act: ComplexActivationFunctionBase](nn.Module):
+class S9Layer[Act: ComplexActivationFunctionBase](nn.Module):
     """
-    Multidimensional S8 Layer (Generalized for D dimensions).
+    Multidimensional S9 Layer (Generalized for D dimensions).
     spatial_shapes의 길이에 따라 1D, 2D, 3D... 로 확장됩니다.
     """
     def __init__(self, d_model: int, spatial_shapes: Tuple[int, ...], gen_activation: callable[[int, float, Literal[32, 64, 128]], Act], eps: float = 1e-6, dtype_idx: Literal[32, 64, 128] = 64):
@@ -108,10 +108,10 @@ class S8Layer[Act: ComplexActivationFunctionBase](nn.Module):
         self.d_model: int = d_model
         self.spatial_dims: int = len(spatial_shapes)
         
-        # 각 차원(Dimension)별로 독립적인 S8 커널 생성
+        # 각 차원(Dimension)별로 독립적인 S9 커널 생성
         # 예: 2D 이미지면 [kernel_H, kernel_W]
         self.kernels: nn.ModuleList = nn.ModuleList([
-            S8SSMKernel(d_model, L=length, dtype_idx=dtype_idx)
+            S9SSMKernel(d_model, L=length, dtype_idx=dtype_idx)
             for length in spatial_shapes
         ])
         

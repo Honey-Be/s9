@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from s8.examples import S8ClassifierModelExample
-from s8.dost import DOST, IDOST
+from s9.examples import S9ClassifierModelExample
+from s9.dost import DOST, IDOST
 import pytest
 
 from typing import Literal
 
-from s8.base import FLOAT_DTYPES_DICT
+from s9.base import FLOAT_DTYPES_DICT
 
 SPATIAL_SHAPES: list[list[int]] = [
     [128],
@@ -18,8 +18,8 @@ SPATIAL_SHAPES: list[list[int]] = [
 
 @pytest.mark.parametrize('D', [1,2,3,4])
 @pytest.mark.parametrize('dtype_idx', [32,64,128])
-def test_s8(D: int, dtype_idx: Literal[32, 64, 128]):
-    print(f"=== S8 {D}D Classifier Model Example Test ===")
+def test_s9(D: int, dtype_idx: Literal[32, 64, 128]):
+    print(f"=== S9 {D}D Classifier Model Example Test ===")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"   Device: {device}")
@@ -32,7 +32,7 @@ def test_s8(D: int, dtype_idx: Literal[32, 64, 128]):
     LAYERS = 1
 
     spatial_shape = SPATIAL_SHAPES[D-1]
-    model = S8ClassifierModelExample(
+    model = S9ClassifierModelExample(
         in_channels=CHANNELS, d_model=D_MODEL, n_layers=LAYERS,
         num_classes=NUM_CLASSES, spatial_shape=spatial_shape,
         dtype_idx=dtype_idx

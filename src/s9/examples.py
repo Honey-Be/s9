@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 from typing import Tuple
-from s8.dost import DOST
-from s8.modules import S8Layer, StableModReLU
+from s9.dost import DOST
+from s9.modules import S9Layer, StableModReLU
 from typing import Tuple, List, Literal
 
-class S8ClassifierModelExample(nn.Module):
+class S9ClassifierModelExample(nn.Module):
     """
-    N-Dimensional S8 Model Architecture.
+    N-Dimensional S9 Model Architecture.
     입력 데이터의 공간 차원(spatial_shape)에 따라 1D, 2D, 3D 등으로 자동 확장됩니다.
     
     Flow:
     Input (Real) -> ND-DOST -> Complex Features 
-    -> Complex Linear Projection -> Stack of ND-S8 Layers -> Magnitude Pooling -> Classifier
+    -> Complex Linear Projection -> Stack of ND-S9 Layers -> Magnitude Pooling -> Classifier
     """
     def __init__(self, in_channels: int, d_model: int, n_layers: int, num_classes: int, spatial_shape: Tuple[int, ...], dtype_idx: Literal[32, 64, 128] = 64):
         super().__init__()
@@ -26,9 +26,9 @@ class S8ClassifierModelExample(nn.Module):
         self.input_proj = None 
         self.d_model = d_model
         
-        # 2. S8 Layers (Complex Domain, N-Dimensional)
+        # 2. S9 Layers (Complex Domain, N-Dimensional)
         self.layers = nn.ModuleList([
-            S8Layer[StableModReLU](d_model=d_model, spatial_shapes=self.spatial_shape, dtype_idx=dtype_idx, gen_activation=StableModReLU)
+            S9Layer[StableModReLU](d_model=d_model, spatial_shapes=self.spatial_shape, dtype_idx=dtype_idx, gen_activation=StableModReLU)
             for _ in range(n_layers)
         ])
         
@@ -82,7 +82,7 @@ class S8ClassifierModelExample(nn.Module):
         else:
             x = self.input_proj(x_dost)
         
-        # 2. S8 Backbone
+        # 2. S9 Backbone
         for layer in self.layers:
             residual = x
             x = layer(x)
