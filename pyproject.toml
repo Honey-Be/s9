@@ -1,0 +1,36 @@
+[project]
+name = "s8"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "윤병익",email = "yeun0908@gmail.com"}
+]
+readme = "README.md"
+license = "LGPL-2.1-or-later"
+requires-python = ">=3.12, <3.14"
+dependencies = [
+    "torch (>=2.10.0,<3.0.0)",
+    "torchvision (>=0.25.0,<0.26.0)",
+    "torchaudio (>=2.10.0,<3.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "s8", from = "src"}]
+
+[[tool.poetry.source]]
+name = "torch_cu130"
+url = "https://download.pytorch.org/whl/cu130"
+priority = "explicit"
+
+
+[tool.poetry.dependencies]
+torch = {source = "torch_cu130"}
+torchvision = {source = "torch_cu130"}
+torchaudio = {source = "torch_cu130"}
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)"
+]
