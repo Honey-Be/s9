@@ -1,7 +1,7 @@
 # S9: Complex-valued Multidimensional SSM with Non-learnable Preprocessing
 
 S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합하여 설계된 새로운 다차원 상태 공간 모델입니다.
-이 모델은 실수 도메인의 데이터를 복소수 도메인으로 확장하여 **위상(Phase)**과 진폭(Amplitude) 정보를 동시에 활용합니다. 이를 위해 **Multidimensional Discrete Orthogonal Stockwell Transform (MD-DOST)** 기반의 학습되지 않는(Non-learnable) 전처리기를 도입했습니다.
+이 모델은 실수 도메인의 데이터를 복소수 도메인으로 확장하여 **위상(Phase)** 과 진폭(Amplitude) 정보를 동시에 활용합니다. 이를 위해 **Multidimensional Discrete Orthogonal Stockwell Transform (MD-DOST)** 기반의 학습되지 않는(Non-learnable) 전처리기를 도입했습니다.
 
 ## 🌟 주요 특징 (Key Features)
 * **Multidimensional S9 Layer**: N차원 데이터(1D 시계열, 2D 이미지, 3D 비디오 등)들을 처리할 수 있는 일반화된 SSM 백본입니다.
