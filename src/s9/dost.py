@@ -5,50 +5,126 @@ from functools import reduce
 
 from s9.base import NonLearnableProcessorBase
 
-from typing import override
+from typing import override, final
+from abc import ABC, abstractmethod
 
-def _get_dyadic_partitions(self, N: int) -> list[tuple[int, int]]:
-    """
-    Generates indices for dyadic partitioning of the frequency spectrum.
-    Fundamental to the Discrete Orthogonal Stockwell Transform.
-    """
-    partitions: list[tuple[int, int]] = []
-    N_eff: int
-    if N % 2 != 0:
-        # Handle odd size by padding or simplifying (simplified here for robustness)
-        N_eff = N - 1
-    else:
-        N_eff = N
+
+class _DOSTBase(NonLearnableProcessorBase, ABC):
+    @final
+    @staticmethod
+    def __get_dyadic_partitions(self, N: int) -> list[tuple[int, int]]:
+        """
+        Generates indices for dyadic partitioning of the frequency spectrum.
+        Fundamental to the Discrete Orthogonal Stockwell Transform.
+        """
+        partitions: list[tuple[int, int]] = []
+        N_eff: int
+        if N % 2 != 0:
+            # Handle odd size by padding or simplifying (simplified here for robustness)
+            N_eff = N - 1
+        else:
+            N_eff = N
+            
+        # DC component
+        partitions.append((0, 1))
         
-    # DC component
-    partitions.append((0, 1))
+        # Positive frequencies dyadic split
+        k: int = 1
+        while k < N_eff // 2:
+            end = min(2 * k, N_eff // 2)
+            partitions.append((k, end))
+            k *= 2
+            
+        # Negative frequencies (Nyquist and beyond)
+        # Simplified: Treat remaining high freqs as one block or mirror structure
+        # For M-DOST in deep learning, we usually focus on the positive spectrum 
+        # and let the complex weights handle the rest, but to be strict:
+        if k < N_eff:
+            partitions.append((k, N_eff))
+
+        return partitions
+
+    @final
+    @staticmethod
+    def _map_bands(S: tuple[int, ...]):
+        for d, size in enumerate(S):
+            partitions: list[tuple[int, int]] = self._get_dyadic_partitions(size)
+            for start, end in partitions:
+                yield (d, start, end)
     
-    # Positive frequencies dyadic split
-    k: int = 1
-    while k < N_eff // 2:
-        end = min(2 * k, N_eff // 2)
-        partitions.append((k, end))
-        k *= 2
-        
-    # Negative frequencies (Nyquist and beyond)
-    # Simplified: Treat remaining high freqs as one block or mirror structure
-    # For M-DOST in deep learning, we usually focus on the positive spectrum 
-    # and let the complex weights handle the rest, but to be strict:
-    if k < N_eff:
-        partitions.append((k, N_eff))
+    @final
+    @staticmethod
+    def _build_band_metadata(S: tuple[int, ...], device: torch.device):
+        band: list[tuple[int, int, int]] = list((d, start, end) for (d, start, end) in self._map_bands(S))
+        return (
+            torch.tensor(band[:, 0], dtype=torch.int64, device=device),
+            torch.tensor(band[:, 1], dtype=torch.int64, device=device),
+            torch.tensor(band[:, 2], dtype=torch.int64, device=device),
+        )
 
-    return partitions
+    @final
+    def _build_mask(
+        self,
+        band_dim: torch.Tensor,
+        band_start: torch.Tensor,
+        band_end: torch.Tensor,
+    ):
+        """
+        Returns:
+            mask: (num_bands, *S) bool
+        """
+        device = band_dim.device
+        D = len(self.S)
+        B = band_dim.shape[0]
 
-def _get_mask_index(D: int, d: int, start: int, end: int) -> tuple[slice, ...]:
-    index: tuple[slice, ...] = tuple(slice(None) for _ in range(D))
-    index[d] = slice(start, end)
-    return index
+        # coordinate grid: (*S, D)
+        coords = torch.meshgrid(
+            *[torch.arange(s, device=device) for s in S],
+            indexing="ij"
+        )
+        grid = torch.stack(coords, dim=-1)  # (*S, D)
 
-class DOST(NonLearnableProcessorBase):
+        # expand for bands
+        grid = grid.unsqueeze(0)            # (B, *S, D)
+        bd = band_dim.view(B, *([1] * D))
+        bs = band_start.view(B, *([1] * D))
+        be = band_end.view(B, *([1] * D))
+
+        in_band = (grid[..., bd] >= bs) & (grid[..., bd] < be)
+
+        # AND across spatial dimensions
+        return in_band.all(dim=-1)
+
+    
+    @abstractmethod
     @override
-    def __init__(self, D: int):
+    def __init__(self, *spatial_shape: *tuple[int, ...], device: torch.device):
         super().__init__()
-        self.D: int = D
+        self.S: tuple[int, ...] = spatial_shape
+        self.D: int = len(spatial_shape)
+
+        band_dim, band_start, band_end = self._build_band_metadata(self.S, device)
+
+        # register band metadata
+        self.register_buffer("band_dim", band_dim, persistent=False)
+        self.register_buffer("band_start", band_start, persistent=False)
+        self.register_buffer("band_end", band_end, persistent=False)
+
+        mask = self._build_mask(
+            self.S,
+            band_dim,
+            band_start,
+            band_end,
+        )
+
+        # (num_bands, *S)
+        self.register_buffer("mask", mask, persistent=False)
+        self.num_bands: int = mask.shape[0]
+
+class DOST(_DOSTBase):
+    @override
+    def __init__(self, spatial_shape: tuple[int, ...], device: torch.device):
+        super().__init__(spatial_shape, device)
     
     @override
     def is_valid_input(self, x: torch.Tensor) -> bool:
@@ -68,46 +144,31 @@ class DOST(NonLearnableProcessorBase):
     def transform(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Input tensor of shape (B, C, tuple (H, W, ...) as S) - Real domain
+            x: Input tensor of shape (B, C, *self.S) - Real domain
         Returns:
-            z: Output tensor of shape (B, C', S) - Complex domain
+            z: Output tensor of shape (B, C', *self.S) - Complex domain
                Where C' is expanded by the number of frequency bands.
         """
-        
-        S: tuple[int, ...] = tuple(x.shape[2:(self.D + 2)])
 
         dims = tuple(range(2, self.D + 2))
 
-        converted = self._convert_to_complex(x)
-        f_x = torch.fft.fftn(converted, dim=dims)
+        x_c = self._convert_to_complex(x)
+        f_x = torch.fft.fftn(x_c, dim=dims).unsqueeze(2)  # (B, C, 1, *S)
 
-        all_partitions: list[list[tuple[int, int]]] = [_get_dyadic_partitions(s) for s in S]
+        mask = self.mask.unsqueeze(0).unsqueeze(0)
 
-        sub_bands: list[torch.Tensor] = []
+        band_freq = f_x * mask
+        band_time = torch.fft.ifftn(band_freq, dim=dims)
 
-        mask: torch.Tensor = torch.zeros(
-            size = S, device = x.device, dtype=converted.dtype
-        )
+        B, C = x.shape[:2]
 
-        for (d, partitions) in enumerate(all_partitions):
-            for (start, end) in partitions:
-                mask.fill_(0.0)
-                mask_index = _get_mask_index(self.D, d, start, end)
-                mask[mask_index] = 1.0
-
-                band_freq = f_x * mask
-                band_time = torch.fft.ifftn(band_freq, dim=dims)
-                sub_bands.append(band_time)
-        
-        out: torch.Tensor = torch.cat(sub_bands, dim = 1)
-        return out
+        return band_time.reshape(B, C * self.num_bands, *self.S)
 
 
-class IDOST(NonLearnableProcessorBase):
+class IDOST(_DOSTBase):
     @override
-    def __init__(self, D: int):
-        super().__init__()
-        self.D: int = D
+    def __init__(self, spatial_shape: tuple[int, ...], device: torch.device):
+        super().__init__(spatial_shape, device)
     
     @override
     def is_valid_input(self, z: torch.Tensor) -> bool:
@@ -117,68 +178,26 @@ class IDOST(NonLearnableProcessorBase):
     def transform(self, z: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Input tensor of shape (B, C', tuple (H, W, ...) as S) - Complex domain
+            x: Input tensor of shape (B, C', *self.S) - Complex domain
                Where C' is expanded by the number of frequency bands.
         Returns:
-            z: Output tensor of shape (B, C, S) - Real domain
+            z: Output tensor of shape (B, C, *self.S) - Real domain
         """
-        
-        S: tuple[int, ...] = tuple(z.shape[2:(self.D + 2)])
 
         dims = tuple(range(2, self.D + 2))
 
-        all_partitions: list[list[tuple[int, int]]] = [_get_dyadic_partitions(s) for s in S]
+        B, C_expanded = z.shape[:2]
+        if C_expanded % self.num_bands != 0:
+            raise RuntimeError("Invalid DOST band structure")
 
-        total_bands = sum(len(partitions) for partitions in all_partitions)
+        C = C_expanded // self.num_bands
 
-        B, C_expanded = z.shape[0], z.shape[1]
+        z = z.view(B, C, self.num_bands, *self.S)
 
-        if C_expanded % total_bands != 0:
-            raise RuntimeError(
-                f"Input channel count ({C_expanded}) is not divisible by total DOST bands ({total_bands}). "
-                "The input might not be a valid DOST output."
-            )
+        z_f = torch.fft.fftn(z, dim=dims)
 
-        C_original = C_expanded // total_bands
+        mask = self.mask.unsqueeze(0).unsqueeze(0)
+        f_recon = torch.sum(z_f * mask, dim=2)
 
-        recon_size: list[int] = [B, C_original] + list(S)
-
-        f_recon = torch.zeros(
-            recon_size, 
-            device=z.device, 
-            dtype=z.dtype
-        )
-
-        current_idx = 0
-
-        # 마스크 캐시 변수
-        mask: torch.Tensor = torch.zeros(size=S, device=z.device, dtype=z.dtype)
-        
-        # 2. 각 밴드별로 분해 -> FFT -> 마스킹 -> 합산
-        for d, partitions in enumerate(all_partitions):
-            for start, end in partitions:
-                # 현재 밴드에 해당하는 부분 추출
-                # z의 구조: [Batch, (Band1_C1..Cn, Band2_C1..Cn, ...), D1, D2...]
-                # 따라서 C_original 개수만큼 씩 잘라내야 함
-                
-                # 슬라이싱 범위: current_idx ~ current_idx + C_original
-                band_time = z[:, current_idx : current_idx + C_original, ...]
-                current_idx = current_idx + C_original
-                
-                # 시간/공간 영역 밴드를 주파수 영역으로 변환
-                band_freq = torch.fft.fftn(band_time, dim=dims)
-                
-                # 해당 밴드의 위치에만 값을 남기고 나머지는 0으로 만듦 (Masking)
-                # DOST에서 해당 영역만 살려서 IFFT 했으므로, 
-                # 여기서도 해당 영역만 다시 살려야 원래 위치로 돌아감.
-                mask.fill_(0.0) # 마스크 캐시 초기화
-                mask_idx = self._get_mask_index(d, start, end)
-                mask[mask_idx] = 1.0
-                
-                # 주파수 스펙트럼 누적
-                f_recon = f_recon + (band_freq * mask)
-        
-        # 3. 최종 IFFT로 원본 신호 복원\
         recon = torch.fft.ifftn(f_recon, dim=dims)
-        
         return recon.real
