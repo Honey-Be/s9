@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
-from typing import final
+from typing import final, Literal
 
 COMPLEX_DTYPES_DICT: dict[Literal[32, 64, 128], torch.dtype] = {
     32: torch.complex32,

@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-from functools import reduce
-
 from s9.base import NonLearnableProcessorBase
 
 from typing import override, final
