@@ -2,8 +2,15 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple, List, Literal
-from s9.base import ComplexActivationFunctionBase, COMPLEX_DTYPES_DICT
+from typing import Callable, Literal, Tuple
+
+try:
+    # Python 3.12+
+    from typing import override
+except Exception:  # pragma: no cover
+    from typing_extensions import override
+
+from s9.base import ComplexActivationFunctionBase, get_complex_dtype, FPDTypeIdx
 
 
 class StableComplexCardioid(ComplexActivationFunctionBase):
@@ -11,7 +18,7 @@ class StableComplexCardioid(ComplexActivationFunctionBase):
     Stable implementation of ComplexCardioid
     """
     @override
-    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: FPDTypeIdx = 64):
         super().__init__(features, eps, dtype_idx)
     
     @override
@@ -34,7 +41,7 @@ class StableModReLU(ComplexActivationFunctionBase):
     z=0에서의 특이점을 해결하기 위해 epsilon smoothing을 사용하여 크기를 계산합니다.
     """
     @override
-    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: FPDTypeIdx = 64):
         super().__init__(features, eps, dtype_idx)
 
     @override
@@ -58,7 +65,7 @@ class S9SSMKernel(nn.Module):
     The Core S9 Kernel (Complex Domain, S4ND structure, S7 State Sharing).
     단일 차원에 대한 커널을 생성합니다.
     """
-    def __init__(self, d_model: int, N: int = 64, L: int = None, dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(self, d_model: int, N: int = 64, L: int | None = None, dtype_idx: FPDTypeIdx = 64):
         super().__init__()
         self.d_model = d_model
         self.N = N # State size
@@ -70,8 +77,9 @@ class S9SSMKernel(nn.Module):
         self.A_imag = nn.Parameter(torch.pi * torch.arange(N).float() / N)
         
         # B and C parameters (Complex)
-        self.B = nn.Parameter(torch.randn(d_model, N, dtype=COMPLEX_DTYPES_DICT[dtype_idx]))
-        self.C = nn.Parameter(torch.randn(d_model, N, dtype=COMPLEX_DTYPES_DICT[dtype_idx]))
+        c_dtype = get_complex_dtype(dtype_idx)
+        self.B = nn.Parameter(torch.randn(d_model, N, dtype=c_dtype))
+        self.C = nn.Parameter(torch.randn(d_model, N, dtype=c_dtype))
         
         # Delta (Step size)
         self.log_dt = nn.Parameter(torch.rand(d_model) * (math.log(0.1) - math.log(0.001)) + math.log(0.001))
@@ -98,12 +106,19 @@ class S9SSMKernel(nn.Module):
         
         return K
 
-class S9Layer[Act: ComplexActivationFunctionBase](nn.Module):
+class S9Layer(nn.Module):
     """
     Multidimensional S9 Layer (Generalized for D dimensions).
     spatial_shapes의 길이에 따라 1D, 2D, 3D... 로 확장됩니다.
     """
-    def __init__(self, d_model: int, spatial_shapes: Tuple[int, ...], gen_activation: callable[[int, float, Literal[32, 64, 128]], Act], eps: float = 1e-6, dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(
+        self,
+        d_model: int,
+        spatial_shapes: Tuple[int, ...],
+        gen_activation: Callable[[int, float, FPDTypeIdx], ComplexActivationFunctionBase],
+        eps: float = 1e-6,
+        dtype_idx: FPDTypeIdx = 64,
+    ):
         super().__init__()
         self.d_model: int = d_model
         self.spatial_dims: int = len(spatial_shapes)
@@ -115,8 +130,8 @@ class S9Layer[Act: ComplexActivationFunctionBase](nn.Module):
             for length in spatial_shapes
         ])
         
-        self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=COMPLEX_DTYPES_DICT[dtype_idx])
-        self.activation: Act = gen_activation(d_model, eps, dtype_idx)
+        self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=get_complex_dtype(dtype_idx))
+        self.activation = gen_activation(d_model, eps, dtype_idx)
         self.dropout: nn.Dropout = nn.Dropout(0.1)
 
     def forward(self, u: torch.Tensor) -> torch.Tensor:

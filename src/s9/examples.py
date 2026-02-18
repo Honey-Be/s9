@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 from typing import Tuple
+
+from s9.base import FPDTypeIdx
 from s9.dost import DOST
 from s9.modules import S9Layer, StableModReLU
-from typing import Tuple, List, Literal
 
 class S9ClassifierModelExample(nn.Module):
     """
@@ -14,23 +15,38 @@ class S9ClassifierModelExample(nn.Module):
     Input (Real) -> ND-DOST -> Complex Features 
     -> Complex Linear Projection -> Stack of ND-S9 Layers -> Magnitude Pooling -> Classifier
     """
-    def __init__(self, in_channels: int, d_model: int, n_layers: int, num_classes: int, spatial_shape: Tuple[int, ...], dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(
+        self,
+        in_channels: int,
+        d_model: int,
+        n_layers: int,
+        num_classes: int,
+        spatial_shape: Tuple[int, ...],
+        dtype_idx: FPDTypeIdx = 64,
+    ):
         super().__init__()
         
         self.spatial_shape = spatial_shape
         self.D = len(spatial_shape) # Dimension (1, 2, 3, ...)
         
         # 1. Non-learnable Preprocessor (Multidimensional DOST)
-        self.dost = DOST(D=self.D)
+        self.dost = DOST(spatial_shape)
         
         self.input_proj = None 
         self.d_model = d_model
         
         # 2. S9 Layers (Complex Domain, N-Dimensional)
-        self.layers = nn.ModuleList([
-            S9Layer[StableModReLU](d_model=d_model, spatial_shapes=self.spatial_shape, dtype_idx=dtype_idx, gen_activation=StableModReLU)
-            for _ in range(n_layers)
-        ])
+        self.layers = nn.ModuleList(
+            [
+                S9Layer(
+                    d_model=d_model,
+                    spatial_shapes=self.spatial_shape,
+                    dtype_idx=dtype_idx,
+                    gen_activation=StableModReLU,
+                )
+                for _ in range(n_layers)
+            ]
+        )
         
         # 3. Output Head
         self.norm = nn.LayerNorm(d_model)

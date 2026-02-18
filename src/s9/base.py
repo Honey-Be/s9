@@ -1,19 +1,34 @@
+import warnings
+
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
 from typing import final, Literal
 
-COMPLEX_DTYPES_DICT: dict[Literal[32, 64, 128], torch.dtype] = {
+FPDTypeIdx = Literal[32, 64, 128]
+
+EXPERIMENTAL_DTYPE_IDXS: set[FPDTypeIdx] = {32}
+
+COMPLEX_DTYPES_DICT: dict[FPDTypeIdx, torch.dtype] = {
     32: torch.complex32,
     64: torch.complex64,
-    128: torch.complex128
+    128: torch.complex128,
 }
 
-FLOAT_DTYPES_DICT: dict[Literal[32, 64, 128], torch.dtype] = {
+FLOAT_DTYPES_DICT: dict[FPDTypeIdx, torch.dtype] = {
     32: torch.float16,
     64: torch.float32,
-    128: torch.float64
+    128: torch.float64,
 }
+
+
+def get_complex_dtype(dtype_idx: FPDTypeIdx) -> torch.dtype:
+    """Return a complex dtype for the given dtype index.
+        - 32 -> complex32
+        - 64 -> complex64
+        - 128 -> complex128
+    """
+    return COMPLEX_DTYPES_DICT[dtype_idx]
 
 class NonLearnableProcessorBase(nn.Module, ABC):
     @abstractmethod
@@ -44,7 +59,7 @@ class NonLearnableProcessorBase(nn.Module, ABC):
 
 class ComplexActivationFunctionBase(nn.Module, ABC):
     @abstractmethod
-    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: Literal[32, 64, 128] = 64):
+    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: FPDTypeIdx = 64):
         super().__init__()
 
         self.bias: nn.Parameter = nn.Parameter(torch.zeros(features, dtype=FLOAT_DTYPES_DICT[dtype_idx]))
