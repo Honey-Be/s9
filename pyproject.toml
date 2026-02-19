@@ -1,6 +1,6 @@
 [project]
 name = "s9"
-version = "0.2.2"
+version = "0.2.3"
 description = "S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion"
 authors = [
     {name = "윤병익",email = "yeun0908@gmail.com"}
@@ -9,21 +9,8 @@ readme = "README.md"
 license = "LGPL-2.1-or-later"
 requires-python = ">=3.12, <3.14"
 
-[project.optional-dependencies]
-cpu = [
-    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cpu ; extra == 'cpu' and extra != 'cu126' and extra != 'cu128' and extra != 'cu130'"
-]
-cu126 = [
-    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu126 ; extra != 'cpu' and extra == 'cu126' and extra != 'cu128' and extra != 'cu130'"
-]
-cu128 = [
-    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu128 ; extra != 'cpu' and extra != 'cu126' and extra == 'cu128' and extra != 'cu130'"
-]
-cu130 = [
-    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu130 ; extra != 'cpu' and extra != 'cu126' and extra != 'cu128' and extra == 'cu130'"
-]
-
 [tool.poetry]
+requires-poetry = ">=2.0"
 packages = [{include = "s9", from = "src"}]
 
 [[tool.poetry.source]]
@@ -55,11 +42,10 @@ torch = [
 ]
 
 [tool.poetry.extras]
-cpu = []
-cu126 = []
-cu128 = []
-cu130 = []
-
+cpu = ["torch"]
+cu126 = ["torch"]
+cu128 = ["torch"]
+cu130 = ["torch"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
