@@ -1,6 +1,6 @@
 [project]
 name = "s9"
-version = "0.2.1"
+version = "0.2.2"
 description = "S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion"
 authors = [
     {name = "윤병익",email = "yeun0908@gmail.com"}
@@ -11,16 +11,16 @@ requires-python = ">=3.12, <3.14"
 
 [project.optional-dependencies]
 cpu = [
-    "torch (>=2.10.0+cpu,<3.0.0+cpu) ; extra == 'cpu' and extra != 'cu126' and extra != 'cu128' and extra != 'cu130'"
+    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cpu ; extra == 'cpu' and extra != 'cu126' and extra != 'cu128' and extra != 'cu130'"
 ]
 cu126 = [
-    "torch (>=2.10.0+cu126,<3.0.0+cu126) ; extra != 'cpu' and extra == 'cu126' and extra != 'cu128' and extra != 'cu130'"
+    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu126 ; extra != 'cpu' and extra == 'cu126' and extra != 'cu128' and extra != 'cu130'"
 ]
 cu128 = [
-    "torch (>=2.10.0+cu128,<3.0.0+cu128) ; extra != 'cpu' and extra != 'cu126' and extra == 'cu128' and extra != 'cu130'"
+    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu128 ; extra != 'cpu' and extra != 'cu126' and extra == 'cu128' and extra != 'cu130'"
 ]
 cu130 = [
-    "torch (>=2.10.0+cu130,<3.0.0+cu130) ; extra != 'cpu' and extra != 'cu126' and extra != 'cu128' and extra == 'cu130'"
+    "torch (>=2.10.0,<3.0.0) @ https://download.pytorch.org/whl/cu130 ; extra != 'cpu' and extra != 'cu126' and extra != 'cu128' and extra == 'cu130'"
 ]
 
 [tool.poetry]
@@ -46,7 +46,7 @@ name = "pytorch-cpu"
 priority = "explicit"
 url = "https://download.pytorch.org/whl/cpu"
 
-[tool.poetry.dependencies]
+[tool.poetry.dependencies]  
 torch = [
     {source = "pytorch-cpu", markers = "extra=='cpu' and extra!='cu126' and extra!='cu128' and extra!='cu130'"},
     {source = "pytorch-cu126", markers = "extra!='cpu' and extra=='cu126' and extra!='cu128' and extra!='cu130'"},
