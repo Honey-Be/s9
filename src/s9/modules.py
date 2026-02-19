@@ -111,25 +111,25 @@ class S9SSMKernel(nn.Module):
 class S9Layer(nn.Module):
     """
     Multidimensional S9 Layer (Generalized for D dimensions).
-    spatial_shapes의 길이에 따라 1D, 2D, 3D... 로 확장됩니다.
+    spatial_dims(= D)에 따라 1D, 2D, 3D... 로 확장됩니다.
     """
     def __init__(
         self,
         d_model: int,
-        spatial_shapes: Tuple[int, ...],
+        spatial_dims: int,
         gen_activation: Callable[[int, float, FPDTypeIdx], ComplexActivationFunctionBase],
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
     ):
         super().__init__()
         self.d_model: int = d_model
-        self.spatial_dims: int = len(spatial_shapes)
+        self.spatial_dims: int = spatial_dims
         
         # 각 차원(Dimension)별로 독립적인 S9 커널 생성
         # 예: 2D 이미지면 [kernel_H, kernel_W]
         self.kernels: nn.ModuleList = nn.ModuleList([
-            S9SSMKernel(d_model, L=length, dtype_idx=dtype_idx)
-            for length in spatial_shapes
+            S9SSMKernel(d_model, L=None, dtype_idx=dtype_idx)
+            for _ in range(spatial_dims)
         ])
         
         self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=get_complex_dtype(dtype_idx))

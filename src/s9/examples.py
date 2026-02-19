@@ -30,7 +30,7 @@ class S9ClassifierModelExample(nn.Module):
         self.D = len(spatial_shape) # Dimension (1, 2, 3, ...)
         
         # 1. Non-learnable Preprocessor (Multidimensional DOST)
-        self.dost = DOST(spatial_shape)
+        self.dost = DOST(self.D)
         
         self.input_proj = None 
         self.d_model = d_model

@@ -25,16 +25,16 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 ``` bash
 # CPU 백엔드
-pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.3"
+pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
 
 # CUDA 12.6 백엔드
-pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.3"
+pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
 
 # CUDA 12.8 백엔드
-pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.3"
+pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
 
 # CUDA 13.0 백엔드
-pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.3"
+pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
 ```
 ## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
