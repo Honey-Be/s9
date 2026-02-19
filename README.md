@@ -76,7 +76,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dost = DOST(D=2) # 2D DOST 전처리기
 layer = S9Layer(
     d_model=d_model,
-    spatial_shapes=spatial_shape,
+    spatial_dims=len(spatial_shape),
     gen_activation=StableModReLU, # 활성화 함수 선택
     dtype_idx=64
 ).to(device)
