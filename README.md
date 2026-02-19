@@ -1,4 +1,4 @@
-# S9: Complex-valued Multidimensional SSM with Non-learnable Preprocessing
+# S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion
 
 S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합하여 설계된 새로운 다차원 상태 공간 모델입니다.
 이 모델은 실수 도메인의 데이터를 복소수 도메인으로 확장하여 **위상(Phase)과 진폭(Amplitude) 정보를 동시에 활용**합니다. 이를 위해 **Multidimensional Discrete Orthogonal Stockwell Transform (MD-DOST)** 기반의 학습되지 않는(Non-learnable) 전처리기를 도입했습니다.
@@ -18,7 +18,10 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 **요구 사항:**
     * Python >= 3.12, < 3.14
-    * PyTorch >= 2.10.0 (CUDA 13.0 지원 버전 권장)
+        - note: tests needed for Python v3.14.x or later
+    * PyTorch(`torch`) >= 2.10.0
+        - note 1: tests needed for PyTorch v2.8.x ~ v2.9.x
+        - note 2: PyTorch <= 2.7.x won't be supported.
 
 ``` bash
 # 저장소 클론
@@ -28,7 +31,7 @@ cd s9
 # 의존성 설치
 poetry install
 ```
-## 🚀 사용법 (Usage)
+## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
 `S9ClassifierModelExample`은 S9 레이어를 활용한 분류 모델의 예시입니다.
 
@@ -66,7 +69,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # 모듈 초기화
 dost = DOST(D=2) # 2D DOST 전처리기
-layer = S9Layer[StableModReLU]( # note: 활성화 함수 구현체 클래스를 제네릭 인자로 제공하는 것을 권장함.
+layer = S9Layer(
     d_model=d_model,
     spatial_shapes=spatial_shape,
     gen_activation=StableModReLU, # 활성화 함수 선택
@@ -78,6 +81,9 @@ x = torch.randn(2, 3, 32, 32).to(device) # Real Input
 z = dost(x) # Real -> Complex (Channel Expansion)
 out = layer(z) # Complex -> Complex Output
 ```
+
+## 부록: RS9
+복소수 도메인을 굳이 필요로 하지 않는 task들을 위해 v0.2.0에서 추가된 **RS9(real-valued S9)** 레이어(`s9.rs9_modules.RS9Layer`)는 domain이 $\mathbb{C}$ 에서 $\mathbb{R}$ 로 변경되면서 DOST를 통한 전처리가 불필요하게 되었지만, 이를 제외한 S9 레이어의 나머지 주요 특징들은 대부분 동일하게 갖습니다.
 
 ## 📚 출처 및 참고 문헌 (References)
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.

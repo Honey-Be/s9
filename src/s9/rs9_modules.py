@@ -1,87 +1,42 @@
+from __future__ import annotations
+
 import math
+import itertools
+from abc import ABC, abstractmethod
+from functools import lru_cache
+from typing import Literal, final, Optional
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from typing import Callable, Literal, Tuple
 
 try:
     # Python 3.12+
-    from typing import override
+    from typing import override, Tuple, Callable
 except Exception:  # pragma: no cover
-    from typing_extensions import override
+    from typing_extensions import override, Tuple, Callable  # type: ignore
 
-from s9.base import ComplexActivationFunctionBase, get_complex_dtype, get_float_dtype, FPDTypeIdx
+from s9.base import get_float_dtype, FPDTypeIdx
 
-
-class StableComplexCardioid(ComplexActivationFunctionBase):
+class RS9SSMKernel(nn.Module):
     """
-    Stable implementation of ComplexCardioid
-    """
-    @override
-    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: FPDTypeIdx = 64):
-        super().__init__(features, eps, dtype_idx)
-    
-    @override
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        # z: (B, D1, D2, ..., C) complex
-
-        # 1. Learnable mu 더하기 & ReLU 적용
-        # m shape: (C,) -> (1, 1, 1, ..., C) broadcasting
-        view_shape = [1] * (z.ndim - 1) + [-1]
-        mu = self.bias.view(*view_shape)
-
-        # 2. Rescale z (위상 유지)
-        arg: torch.Tensor = torch.atan2(z.imag, z.real) - mu
-        coeff: torch.Tensor = (torch.cos(arg) + 1) / 2
-        return (coeff + self.eps) * z
-
-class StableModReLU(ComplexActivationFunctionBase):
-    """
-    Stable implementation of ModReLU.
-    z=0에서의 특이점을 해결하기 위해 epsilon smoothing을 사용하여 크기를 계산합니다.
-    """
-    @override
-    def __init__(self, features: int, eps: float = 1e-6, dtype_idx: FPDTypeIdx = 64):
-        super().__init__(features, eps, dtype_idx)
-
-    @override
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        # z: (B, D1, D2, ..., C) complex
-        
-        # 1. Smoothed magnitude 계산
-        mag = torch.sqrt(z.real.pow(2) + z.imag.pow(2) + self.eps)
-        
-        # 2. Learnable bias 더하기 & ReLU 적용
-        # bias shape: (C,) -> (1, 1, 1, ..., C) broadcasting
-        view_shape = [1] * (z.ndim - 1) + [-1]
-        b = self.bias.view(*view_shape)
-        act_mag = F.relu(mag + b)
-        
-        # 3. Rescale z (위상 유지)
-        return z * (act_mag / mag)
-
-class S9SSMKernel(nn.Module):
-    """
-    The Core S9 Kernel (Complex Domain, S4ND structure, S7 State Sharing).
+    The Core RS9 Kernel (Real Domain, S4ND structure, S7 State Sharing).
     단일 차원에 대한 커널을 생성합니다.
     """
-    def __init__(self, d_model: int, N: int = 64, L: int | None = None, dtype_idx: FPDTypeIdx = 64):
+    def __init__(self, d_model: int, N: int = 64, L: Optional[int] = None, dtype_idx: FPDTypeIdx = 64):
         super().__init__()
         self.d_model = d_model
         self.N = N # State size
         self.L = L # Max sequence length for this dimension
 
-        c_dtype = get_complex_dtype(dtype_idx)
         f_dtype = get_float_dtype(dtype_idx)
 
-        # Real and Imag parts of A (diagonal)
-        # 안정성을 위해 Real(A) < 0 이 되도록 Log 파라미터화
-        self.log_A_real = nn.Parameter(torch.log(0.5 * torch.ones(d_model, N, dtype=f_dtype)))
-        self.A_imag = nn.Parameter(torch.pi * torch.arange(N).to(f_dtype) / N)
+        # A (diagonal)
+        # 안정성을 위해 A < 0 이 되도록 Log 파라미터화
+        self.log_A = nn.Parameter(torch.log(0.5 * torch.ones(d_model, N, dtype=f_dtype)))
         
-        # B and C parameters (Complex)
-        self.B = nn.Parameter(torch.randn(d_model, N, dtype=c_dtype))
-        self.C = nn.Parameter(torch.randn(d_model, N, dtype=c_dtype))
+        # B and C parameters (real)
+        self.B = nn.Parameter(torch.randn(d_model, N, dtype=f_dtype))
+        self.C = nn.Parameter(torch.randn(d_model, N, dtype=f_dtype))
         
         # Delta (Step size)
         self.log_dt = nn.Parameter(torch.rand(d_model, dtype=f_dtype) * (math.log(0.1) - math.log(0.001)) + math.log(0.001))
@@ -89,7 +44,7 @@ class S9SSMKernel(nn.Module):
     def forward(self, length: int) -> torch.Tensor:
         # 1. 파라미터 구체화
         dt = torch.exp(self.log_dt) # (d_model)
-        A = -torch.exp(self.log_A_real) + 1j * self.A_imag # (d_model, N)
+        A = -torch.exp(self.log_A) # (d_model, N)
         
         dt = dt.unsqueeze(-1)
         
@@ -108,16 +63,16 @@ class S9SSMKernel(nn.Module):
         
         return K
 
-class S9Layer(nn.Module):
+class RS9Layer(nn.Module):
     """
-    Multidimensional S9 Layer (Generalized for D dimensions).
+    Multidimensional RS9 Layer (Generalized for D dimensions).
     spatial_shapes의 길이에 따라 1D, 2D, 3D... 로 확장됩니다.
     """
     def __init__(
         self,
         d_model: int,
         spatial_shapes: Tuple[int, ...],
-        gen_activation: Callable[[int, float, FPDTypeIdx], ComplexActivationFunctionBase],
+        gen_activation: Callable[[int, float, FPDTypeIdx], nn.Module],
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
     ):
@@ -125,21 +80,21 @@ class S9Layer(nn.Module):
         self.d_model: int = d_model
         self.spatial_dims: int = len(spatial_shapes)
         
-        # 각 차원(Dimension)별로 독립적인 S9 커널 생성
+        # 각 차원(Dimension)별로 독립적인 RS9 커널 생성
         # 예: 2D 이미지면 [kernel_H, kernel_W]
         self.kernels: nn.ModuleList = nn.ModuleList([
-            S9SSMKernel(d_model, L=length, dtype_idx=dtype_idx)
+            RS9SSMKernel(d_model, L=length, dtype_idx=dtype_idx)
             for length in spatial_shapes
         ])
         
-        self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=get_complex_dtype(dtype_idx))
+        self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=get_float_dtype(dtype_idx))
         self.activation = gen_activation(d_model, eps, dtype_idx)
         self.dropout: nn.Dropout = nn.Dropout(0.1)
 
     def forward(self, u: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            u: (B, C, D1, D2, ...) Complex Input
+            u: (B, C, D1, D2, ...) Real Input
         """
         B = u.shape[0]
         C = u.shape[1]
@@ -182,14 +137,14 @@ class S9Layer(nn.Module):
         fft_dims = tuple(range(-self.spatial_dims, 0))
         
         # FFT
-        u_f = torch.fft.fftn(u, s=padded_shapes, dim=fft_dims)
-        k_f = torch.fft.fftn(k_global, s=padded_shapes, dim=fft_dims)
+        u_f = torch.fft.rfftn(u, s=padded_shapes, dim=fft_dims)
+        k_f = torch.fft.rfftn(k_global, s=padded_shapes, dim=fft_dims)
         
         # Convolution in Frequency Domain
         y_f = u_f * k_f 
         
         # IFFT
-        y = torch.fft.ifftn(y_f, s=padded_shapes, dim=fft_dims)
+        y = torch.fft.irfftn(y_f, s=padded_shapes, dim=fft_dims)
         
         # Crop (원래 크기로 자르기)
         # 슬라이스 객체 생성: [..., :D1, :D2, ...]

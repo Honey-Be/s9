@@ -30,6 +30,14 @@ def get_complex_dtype(dtype_idx: FPDTypeIdx) -> torch.dtype:
     """
     return COMPLEX_DTYPES_DICT[dtype_idx]
 
+def get_float_dtype(dtype_idx: FPDTypeIdx) -> torch.dtype:
+    """Return a complex dtype for the given dtype index.
+        - 32 -> float16
+        - 64 -> float32
+        - 128 -> float64
+    """
+    return FLOAT_DTYPES_DICT[dtype_idx]
+
 class NonLearnableProcessorBase(nn.Module, ABC):
     @abstractmethod
     def __init__(self):

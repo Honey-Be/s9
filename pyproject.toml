@@ -1,7 +1,7 @@
 [project]
 name = "s9"
-version = "0.1.0"
-description = ""
+version = "0.2.0"
+description = "S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion"
 authors = [
     {name = "윤병익",email = "yeun0908@gmail.com"}
 ]
@@ -18,15 +18,52 @@ dependencies = [
 packages = [{include = "s9", from = "src"}]
 
 [[tool.poetry.source]]
-name = "torch_cu130"
+name = "pytorch-cuda130"
 url = "https://download.pytorch.org/whl/cu130"
 priority = "explicit"
 
+[[tool.poetry.source]]
+name = "pytorch-cuda128"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "pytorch-cuda126"
+url = "https://download.pytorch.org/whl/cu126"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+priority = "explicit"
+url = "https://download.pytorch.org/whl/cpu"
 
 [tool.poetry.dependencies]
-torch = {source = "torch_cu130"}
-torchvision = {source = "torch_cu130"}
-torchaudio = {source = "torch_cu130"}
+torch = {source = "pytorch-cpu", markers = "extra=='cpu' and extra!='cuda126' and extra!='cuda128' and extra!='cuda130'"}
+
+[tool.poetry.group.cuda126]
+optional = true
+
+[tool.poetry.group.cuda126.dependencies]
+torch = {source = "pytorch-cuda126", markers = "extra!='cpu' and extra=='cuda126' and extra!='cuda128' and extra!='cuda130'"}
+
+[tool.poetry.group.cuda128]
+optional = true
+
+[tool.poetry.group.cuda128.dependencies]
+torch = {source = "pytorch-cuda128", markers = "extra!='cpu' and extra!='cuda126' and extra=='cuda128' and extra!='cuda130'"}
+
+[tool.poetry.group.cuda130]
+optional = true
+
+[tool.poetry.group.cuda130.dependencies]
+torch = {source = "pytorch-cuda130", markers = "extra!='cpu' and extra!='cuda126' and extra!='cuda128' and extra=='cuda130'"}
+
+[tool.poetry.extras]
+cpu  = ["torch"]
+cuda126 = ["torch"]
+cuda128 = ["torch"]
+cuda130 = ["torch"]
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
