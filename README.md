@@ -24,12 +24,17 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
         - note 2: PyTorch <= 2.7.x won't be supported.
 
 ``` bash
-# 저장소 클론
-git clone https://github.com/Honey-Be/s9.git
-cd s9
+# CPU 백엔드
+pip install s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.0
 
-# 의존성 설치
-poetry install
+# CUDA 12.6 백엔드
+pip install s9[cuda126] @ git+https://github.com/Honey-Be/s9.git@v0.2.0
+
+# CUDA 12.8 백엔드
+pip install s9[cuda128] @ git+https://github.com/Honey-Be/s9.git@v0.2.0
+
+# CUDA 13.0 백엔드
+pip install s9[cuda130] @ git+https://github.com/Honey-Be/s9.git@v0.2.0
 ```
 ## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
