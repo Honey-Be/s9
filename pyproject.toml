@@ -1,6 +1,6 @@
 [project]
 name = "s9"
-version = "0.2.4"
+version = "0.2.5"
 description = "S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion"
 authors = [
     {name = "윤병익",email = "yeun0908@gmail.com"}
