@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import Tuple
 
 from s9.base import FPDTypeIdx
-from s9.dost import DOST
+from s9.transforms.dost import DOST
 from s9.modules import S9Layer, StableModReLU
 
 class S9ClassifierModelExample(nn.Module):
@@ -40,7 +40,7 @@ class S9ClassifierModelExample(nn.Module):
             [
                 S9Layer(
                     d_model=d_model,
-                    spatial_shapes=self.spatial_shape,
+                    spatial_dims=self.D,
                     dtype_idx=dtype_idx,
                     gen_activation=StableModReLU,
                 )

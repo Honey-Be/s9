@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from s9.examples import S9ClassifierModelExample
-from s9.dost import DOST, IDOST
+from s9.transforms.dost import DOST, IDOST
 import pytest
 
 from typing import Literal
