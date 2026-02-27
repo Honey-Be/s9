@@ -60,7 +60,7 @@ print(logits.shape) # torch.Size([2, 10])
 ```
 
 2. **S9 레이어 직접 활용 (Backbone)**
-`S9Layer`를 여러분의 모델의 백본으로 사용할 수 있습니다. 단, 입력은 복소수 텐서여야 하므로 `DOST` 전처리기와 함께 사용하는 것을 권장합니다.
+`S9Layer`를 여러분의 모델의 백본으로 사용할 수 있습니다. 단, 입력은 복소수 텐서여야 하므로 실수 -> 복소수 가역변환(예: DOST)으로 구성된 non-learnable 전처리기와 함께 사용하는 것을 권장합니다.
 
 ```python
 import torch
@@ -87,8 +87,15 @@ z = dost(x) # Real -> Complex (Channel Expansion)
 out = layer(z) # Complex -> Complex Output
 ```
 
-## 부록: RS9
+## 부록 1: RS9
 복소수 도메인을 굳이 필요로 하지 않는 task들을 위해 v0.2.0에서 추가된 **RS9(real-valued S9)** 레이어(`s9.rs9_modules.RS9Layer`)는 domain이 $\mathbb{C}$ 에서 $\mathbb{R}$ 로 변경되면서 DOST를 통한 전처리가 불필요하게 되었지만, 이를 제외한 S9 레이어의 나머지 주요 특징들은 대부분 동일하게 갖습니다.
+
+# 부록 2: 실수 -> 복소수 가역변환 기반 non-learnable 전처리기
+v0.2.5에서는 DOST/IDOST의 대체재로 사용할 수 있는 전처리기들과 이들에 결합할 수 있는 Synchrosqueezing Transform 기반 non-learnable wrapper가 추가되었습니다.
+* **[2D-only, standalone]** Fast Curvelet Transform
+* **[3D-only, standalone]** Fast Surfacelet Transform
+* **[`N`-dimensional, standalone]** Riesz Transform
+* **[`N`-dimensional, non-standalone]** Synchrosqueezing Transform
 
 ## 📚 출처 및 참고 문헌 (References)
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.
