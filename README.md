@@ -64,7 +64,7 @@ print(logits.shape) # torch.Size([2, 10])
 
 ```python
 import torch
-from s9.dost import DOST
+from s9.transforms.dost import DOST
 from s9.modules import S9Layer, StableModReLU
 
 # 설정
