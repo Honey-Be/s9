@@ -25,16 +25,16 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 ``` bash
 # CPU 백엔드
-pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
+pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.6"
 
 # CUDA 12.6 백엔드
-pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
+pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.6"
 
 # CUDA 12.8 백엔드
-pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
+pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.6"
 
 # CUDA 13.0 백엔드
-pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.4"
+pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.6"
 ```
 ## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
@@ -96,6 +96,11 @@ v0.2.5에서는 DOST/IDOST의 대체재로 사용할 수 있는 전처리기들�
 * **[3D-only, standalone]** Fast Surfacelet Transform
 * **[`N`-dimensional, standalone]** Riesz Transform
 * **[`N`-dimensional, non-standalone]** Synchrosqueezing Transform
+
+# 부록 3: 활성 함수 리팩터링 및 추가
+v0.2.6에서는 이전까지 `s9.modules` 네임스페이스에서 직접 제공하였던 `StableComplexCardioid` 및 `StableModReLU` 활성화함수들을 `s9.activations.complex.*` 네임스페이스로 이관하였으며, `s9.activations.real.*` 네임스페이스에 `ThASh`(TanhArSinh) 및 `HGLU`(Hyperbolic Gain Linear Unit) 활성화함수들을 추가하였습니다.
+$$ \text{ThASh}(x) = \text{tanh}(\text{arsinh}(x)) = \frac{x}{\sqrt{1 + x^2}} $$
+$$ \forall k > 0 \text{HGLU}_k(x) = \frac{x + \sqrt{k + x^2}}{2} $$
 
 ## 📚 출처 및 참고 문헌 (References)
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.
