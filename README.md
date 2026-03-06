@@ -90,14 +90,14 @@ out = layer(z) # Complex -> Complex Output
 ## 부록 1: RS9
 복소수 도메인을 굳이 필요로 하지 않는 task들을 위해 v0.2.0에서 추가된 **RS9(real-valued S9)** 레이어(`s9.rs9_modules.RS9Layer`)는 domain이 $\mathbb{C}$ 에서 $\mathbb{R}$ 로 변경되면서 DOST를 통한 전처리가 불필요하게 되었지만, 이를 제외한 S9 레이어의 나머지 주요 특징들은 대부분 동일하게 갖습니다.
 
-# 부록 2: 실수 -> 복소수 가역변환 기반 non-learnable 전처리기
+## 부록 2: 실수 -> 복소수 가역변환 기반 non-learnable 전처리기
 v0.2.5에서는 DOST/IDOST의 대체재로 사용할 수 있는 전처리기들과 이들에 결합할 수 있는 Synchrosqueezing Transform 기반 non-learnable wrapper가 추가되었습니다.
 * **[2D-only, standalone]** Fast Curvelet Transform
 * **[3D-only, standalone]** Fast Surfacelet Transform
 * **[`N`-dimensional, standalone]** Riesz Transform
 * **[`N`-dimensional, non-standalone]** Synchrosqueezing Transform
 
-# 부록 3: 활성 함수 리팩터링 및 추가
+## 부록 3: 활성 함수 리팩터링 및 추가
 v0.2.6에서는 이전까지 `s9.modules` 네임스페이스에서 직접 제공하였던 `StableComplexCardioid` 및 `StableModReLU` 활성화함수들을 `s9.activations.complex.*` 네임스페이스로 이관하였으며, `s9.activations.real.*` 네임스페이스에 `ThASh`(TanhArSinh) 및 `HGLU`(Hyperbolic Gain Linear Unit) 활성화함수들을 추가하였습니다.
 $$ \text{ThASh}(x) = \text{tanh}(\text{arsinh}(x)) = \frac{x}{\sqrt{1 + x^2}} $$
 $$ \forall k > 0 \text{HGLU}_k(x) = \frac{x + \sqrt{k + x^2}}{2} $$
