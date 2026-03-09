@@ -65,7 +65,8 @@ print(logits.shape) # torch.Size([2, 10])
 ```python
 import torch
 from s9.transforms.dost import DOST
-from s9.modules import S9Layer, StableModReLU
+from s9.modules import S9Layer
+from s9.activations.complex.stable_modrelu import StableModReLU
 
 # 설정
 d_model = 64
