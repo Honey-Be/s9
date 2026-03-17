@@ -9,7 +9,7 @@ except Exception:  # pragma: no cover
     from typing_extensions import override
 
 from s9.base import ComplexActivationFunctionBase, FPDTypeIdx
-
+import torch.nn.functional as F
 
 class StableModReLU(ComplexActivationFunctionBase):
     """

@@ -7,18 +7,13 @@ import pytest
 
 from typing import Literal
 
-from s9.base import FLOAT_DTYPES_DICT
+from s9.base import FLOAT_DTYPES_DICT, FPDTypeIdx
 
-SPATIAL_SHAPES: list[list[int]] = [
-    [128],
-    [32, 32],
-    [8, 16, 16],
-    [8, 8, 8, 8]
-]
+from . import SPATIAL_SHAPES
 
 @pytest.mark.parametrize('D', [1,2,3,4])
 @pytest.mark.parametrize('dtype_idx', [32,64,128])
-def test_s9(D: int, dtype_idx: Literal[32, 64, 128]):
+def test_mock_classification(D: int, dtype_idx: FPDTypeIdx):
     print(f"=== S9 {D}D Classifier Model Example Test ===")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,7 +33,7 @@ def test_s9(D: int, dtype_idx: Literal[32, 64, 128]):
         dtype_idx=dtype_idx
     ).to(device)
 
-    input = torch.randn([BATCH_SIZE, CHANNELS] + spatial_shape, dtype=FLOAT_DTYPES_DICT[dtype_idx]).to(device)
+    input = torch.randn([BATCH_SIZE, CHANNELS] + spatial_shape, dtype=FLOAT_DTYPES_DICT[dtype_idx]).to(device=device)
     output = model(input)
     print(f"   Input: {input.shape} -> Output: {output.shape}")
     assert output.shape == (BATCH_SIZE, NUM_CLASSES)

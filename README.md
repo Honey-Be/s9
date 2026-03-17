@@ -25,16 +25,16 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 ``` bash
 # CPU 백엔드
-pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.7"
+pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
 
 # CUDA 12.6 백엔드
-pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.7"
+pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
 
 # CUDA 12.8 백엔드
-pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.7"
+pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
 
 # CUDA 13.0 백엔드
-pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.7"
+pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
 ```
 ## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
@@ -102,6 +102,80 @@ v0.2.5에서는 DOST/IDOST의 대체재로 사용할 수 있는 전처리기들�
 v0.2.6에서는 이전까지 `s9.modules` 네임스페이스에서 직접 제공하였던 `StableComplexCardioid` 및 `StableModReLU` 활성화함수들을 `s9.activations.complex.*` 네임스페이스로 이관하였으며, `s9.activations.real.*` 네임스페이스에 `ThASh`(TanhArSinh) 및 `HGLU`(Hyperbolic Gain Linear Unit) 활성화함수들을 추가하였습니다.
 $$ \text{ThASh}(x) = \text{tanh}(\text{arsinh}(x)) = \frac{x}{\sqrt{1 + x^2}} $$
 $$ \forall k > 0 \text{HGLU}_k(x) = \frac{x + \sqrt{k + x^2}}{2} $$
+
+## 부록 4: Multi-head S9/RS9 및 Biaffine S9/RS9
+
+v0.2.8에서는 기존 S9/RS9 레이어를 다음과 같은 계층으로 일반화한 파생 레이어들이 추가되었습니다.
+
+$$
+\text{기존 S9/RS9}
+\;\to\;
+\text{Multi-head S9/RS9}
+\;\to\;
+\text{Biaffine S9/RS9}
+$$
+
+추가된 레이어들은 다음과 같습니다.
+
+* `s9.multihead_s9_modules.MultiheadS9Layer`
+* `s9.multihead_rs9_modules.MultiheadRS9Layer`
+* `s9.biaffine_s9_modules.BiaffineS9Layer`
+* `s9.biaffine_rs9_modules.BiaffineRS9Layer`
+
+### 4-1. Multi-head S9/RS9
+
+`MultiheadS9Layer` 및 `MultiheadRS9Layer`는 기존 S9/RS9의 다차원 SSM 구조를 유지하면서, 여러 개의 head를 병렬로 두도록 일반화한 레이어들입니다. 각 head는 다음과 같은 절차로 동작합니다.
+
+1. 입력 채널을 head별 잠재 채널(latent channels)로 선형 사상
+2. 각 공간 차원별로 독립적인 1D SSM kernel 생성
+3. 이 1D kernel들의 outer product를 통해 다차원 global kernel 구성
+4. FFT 기반의 다차원 convolution 수행
+5. head 출력을 다시 모델 차원으로 사상
+
+모든 head의 출력은 합산되며, 그 뒤에 기존 S9/RS9와 마찬가지로 activation, output linear layer, dropout이 적용됩니다. 즉, **기존 S4ND 계열의 outer-product kernel 구성 및 FFT convolution 경로는 유지하면서, head 단위의 병렬 분해를 추가한 구조**라고 볼 수 있습니다.
+
+`MultiheadS9Layer`는 complex-valued 입력/출력을 대상으로 하며, `MultiheadRS9Layer`는 real-valued 입력/출력을 대상으로 합니다. 이를 제외한 큰 구조적 아이디어는 양쪽이 거의 동일합니다.
+
+### 4-2. Biaffine S9/RS9
+
+`BiaffineS9Layer` 및 `BiaffineRS9Layer`는 위의 multi-head 구조를 바탕으로, 각 head 내부의 단순 선형 입력/출력 사상을 **latent kernel bank + biaffine channel coupling**으로 일반화한 레이어들입니다.
+
+직관적으로는, multi-head 계열이 “head별 잠재 채널로 투영한 뒤 convolution을 수행하는 구조”라면, biaffine 계열은 여기에 더해 **입력 채널과 출력 채널 사이의 쌍별 상호작용(pairwise interaction)** 을 더 풍부하게 모델링합니다. 이를 위해 각 head는 다음과 같은 두 종류의 계수를 학습합니다.
+
+* 입력 채널 쪽 mixing 계수
+* 출력 채널 쪽 mixing 계수
+
+그리고 이 둘을 latent kernel bank와 결합하여, 단순한 채널별 convolution이 아니라 **입력 채널–출력 채널 쌍에 대해 보다 풍부한 coupling** 이 일어나도록 구성합니다. 이 구조는 기존 S9/RS9의 다차원 SSM 및 FFT 기반 convolution 경로를 보존하면서도, 채널 간 상호작용 표현력을 확장하는 데 목적이 있습니다.
+
+### 4-3. 공통점과 차이점
+
+이 네 가지 파생 레이어들은 모두 다음 공통점을 가집니다.
+
+* 각 공간 차원별 1D SSM kernel 생성
+* outer product 기반 다차원 global kernel 구성
+* FFT 기반 다차원 convolution
+* pointwise activation + output linear + dropout
+
+즉, **기존 S9/RS9의 다차원 SSM backbone은 유지**됩니다. 차이점은 채널 결합 방식에 있습니다.
+
+* `Multihead*Layer`: head 단위의 병렬 분해를 도입
+* `Biaffine*Layer`: multi-head 구조 위에 biaffine channel coupling을 추가
+
+또한 field 관점에서 보면,
+
+* `S9` 계열: complex-valued
+* `RS9` 계열: real-valued
+
+이라는 차이만 있으며, 구조적 아이디어 자체는 최대한 공통적으로 유지됩니다.
+
+### 4-4. 관련 예시 코드
+
+v0.2.8에서는 S9 계열에 대해 아래 예시 모델도 함께 제공됩니다.
+
+* `s9.examples.MultiheadS9ClassifierModelExample`
+* `s9.examples.BiaffineS9ClassifierModelExample`
+
+이 예시들은 DOST 기반 복소수 전처리 뒤에 Multi-head S9 또는 Biaffine S9 백본을 쌓아 분류를 수행하는 최소 예제입니다.
 
 ## 📚 출처 및 참고 문헌 (References)
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.

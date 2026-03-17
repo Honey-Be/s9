@@ -14,6 +14,9 @@ except ImportError:
     from typing_extensions import override
 
 from s9.base import NonLearnableProcessorBase, FPDTypeIdx, COMPLEX_DTYPES_DICT, FLOAT_DTYPES_DICT
+from s9.transforms.base import InvertibleTransformsBase
+
+from collections.abc import Sequence
 
 
 def get_dyadic_partitions(N: int) -> list[tuple[int, int]]:
@@ -46,11 +49,10 @@ def _band_slices_cached(spatial_shape: tuple[int, ...]) -> tuple[tuple[slice, ..
         out.append(tuple(slice(int(st), int(en)) for (st, en) in band))
     return tuple(out)
 
-
-class DynamicDOSTBase(NonLearnableProcessorBase, ABC):
+class DynamicDOSTBase[I: DynamicDOSTBase[Self]](InvertibleTransformsBase[I], ABC):
     """Common base for dynamic DOST/IDOST with cached tensors and metadata."""
 
-    @final
+    @abstractmethod
     @override
     def __init__(self, D: int):
         super().__init__()
@@ -105,7 +107,7 @@ class DynamicDOSTBase(NonLearnableProcessorBase, ABC):
         return tuple(range(2, 2 + self.D))
 
 
-class DOST(DynamicDOSTBase):
+class DOST(DynamicDOSTBase['IDOST']):
     """Discrete Orthogonal Stockwell Transform (Dynamic Resolution)."""
 
     @override
@@ -119,12 +121,12 @@ class DOST(DynamicDOSTBase):
     def _to_complex(self, x: torch.Tensor, dtype_idx: FPDTypeIdx | None = None) -> torch.Tensor:
         if dtype_idx is None:
             if x.dtype == torch.float64:
-                return x.to(torch.complex128)
+                return x.to(dtype=torch.complex128)
             if x.dtype == torch.float16:
-                return x.to(torch.complex32)
-            return x.to(torch.float32).to(torch.complex64)
+                return x.to(dtype=torch.complex32)
+            return x.to(dtype=torch.float32).to(dtype=torch.complex64)
         else:
-            return x.to(FLOAT_DTYPES_DICT[dtype_idx]).to(COMPLEX_DTYPES_DICT[dtype_idx])
+            return x.to(dtype=FLOAT_DTYPES_DICT[dtype_idx]).to(dtype=COMPLEX_DTYPES_DICT[dtype_idx])
 
     @override
     def transform(self, x: torch.Tensor, dtype_idx: FPDTypeIdx | None = None) -> torch.Tensor:
@@ -138,13 +140,17 @@ class DOST(DynamicDOSTBase):
         num_bands, _, mask, _, _ = self._get_cached_buffers(spatial_shape, f_x.device)
 
         band_freq = f_x * mask.unsqueeze(0).unsqueeze(0)
-        band_time = torch.fft.ifftn(band_freq, dim=dims)
+        band_time = torch.fft.ifftn(band_freq, dim=tuple(dim+1 for dim in dims))
 
         B, C = x.shape[:2]
         return band_time.reshape(B, C * num_bands, *spatial_shape)
+    
+    @override
+    def get_inverse_transform(self) -> 'IDOST':
+        return IDOST(self.D)
 
 
-class IDOST(DynamicDOSTBase):
+class IDOST(DynamicDOSTBase[DOST]):
     """Inverse DOST (Dynamic Resolution)."""
 
     @override
@@ -179,7 +185,7 @@ class IDOST(DynamicDOSTBase):
             strategy = "sparse"
 
         if strategy == "dense":
-            z_f = torch.fft.fftn(z, dim=dims)
+            z_f = torch.fft.fftn(z, dim=tuple(dim+1 for dim in dims))
             f_recon = torch.sum(z_f * mask.unsqueeze(0).unsqueeze(0), dim=2)
             recon = torch.fft.ifftn(f_recon, dim=dims)
             
@@ -198,7 +204,7 @@ class IDOST(DynamicDOSTBase):
         for b0 in range(0, num_bands, blk):
             b1 = min(b0 + blk, num_bands)
             z_blk = z[:, :, b0:b1].contiguous()
-            zf_blk = torch.fft.fftn(z_blk, dim=dims)
+            zf_blk = torch.fft.fftn(z_blk, dim=tuple(dim+1 for dim in dims))
             for i, band in enumerate(range(b0, b1)):
                 sl = band_slices[band]
                 f_recon[(...,) + sl] += zf_blk[:, :, i][(...,) + sl]
@@ -209,3 +215,7 @@ class IDOST(DynamicDOSTBase):
             return recon.real
         else:
             return recon.real.to(FLOAT_DTYPES_DICT[dtype_idx])
+    
+    @override
+    def get_inverse_transform(self) -> DOST:
+        return DOST(self.D)

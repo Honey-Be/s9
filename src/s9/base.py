@@ -3,7 +3,7 @@ import warnings
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
-from typing import final, Literal, Generic, TypedDict, Unpack
+from typing import final, Literal, Generic, TypedDict, Unpack, TypeVar, Protocol, Self
 
 try:
     from typing import override
@@ -113,5 +113,3 @@ class ComplexActivationFunctionBase(nn.Module, ABC):
     @abstractmethod
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         pass
-
-    

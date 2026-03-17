@@ -9,7 +9,8 @@ except:
 from functools import reduce
 
 from collections.abc import Sequence
-from s9.base import NonLearnableProcessorBase, NonLearnableSynchronizedProcessorBase
+from s9.base import NonLearnableProcessorBase, NonLearnableSynchronizedProcessorBase, FPDTypeIdx, get_float_dtype, get_complex_dtype
+from s9.transforms.base import InvertibleTransformsBase
 
 class SynchronizedGenericSSTCache(TypedDict):
     # 역변환을 위한 상태 캐시: { cache_key: (reassigned_bins, original_z) }
@@ -18,16 +19,17 @@ class SynchronizedGenericSSTCache(TypedDict):
     # 캐시를 조회하기 위한 키
     cache_key: str
 
-class SynchronizedGenericSST[T: NonLearnableProcessorBase](NonLearnableSynchronizedProcessorBase[SynchronizedGenericSSTCache]):
+class SynchronizedGenericSST[T: InvertibleTransformsBase['I'], I: InvertibleTransformsBase[T]](NonLearnableSynchronizedProcessorBase[SynchronizedGenericSSTCache]):
     """
     N개의 다중 입력을 동기화하여 단일 Squeezing 상태를 공유하는 특수 SST 컴포넌트
     Python 3.13의 제네릭 타이핑을 적극 활용하여 설계되었습니다.
     """
     @override
-    def __init__(self, base_transform: T, freq_dim_groups: int = 1):
+    def __init__(self, base_transform: T, dtype_idx: FPDTypeIdx, freq_dim_groups: int = 1):
         super().__init__()
-        self.base_transform = base_transform
-        self.freq_dim_groups = freq_dim_groups
+        self.base_transform: T = base_transform
+        self.freq_dim_groups: int = freq_dim_groups
+        self.dtype_idx: FPDTypeIdx = dtype_idx
 
     @override
     def is_valid_input(self, x: torch.Tensor) -> bool:
@@ -49,13 +51,13 @@ class SynchronizedGenericSST[T: NonLearnableProcessorBase](NonLearnableSynchroni
         z_reshaped_s = tuple(z.view(B, self.freq_dim_groups, freq_bins, *spatial_shape) for z in zs)
 
         # 2. 다중 모달리티 융합을 위한 통합 위상 도함수(IF) 계산
-        shared_if_sum = torch.zeros_like(z_reshaped_s[0], dtype=torch.float32)
-        total_mag = torch.zeros_like(shared_if_sum)
+        shared_if_sum = torch.zeros_like(z_reshaped_s[0], dtype=get_float_dtype(self.dtype_idx))
+        total_mag = torch.zeros_like(shared_if_sum, dtype=get_float_dtype(self.dtype_idx))
 
         for z_res in z_reshaped_s:
             phase = torch.angle(z_res)
             mag = torch.abs(z_res)
-            if_sum = torch.zeros_like(phase)
+            if_sum = torch.zeros_like(phase, dtype=get_float_dtype(self.dtype_idx))
             
             for dim in range(3, z_res.ndim):
                 if_sum += torch.abs(torch.gradient(phase, dim=dim)[0])
@@ -64,24 +66,34 @@ class SynchronizedGenericSST[T: NonLearnableProcessorBase](NonLearnableSynchroni
             shared_if_sum += if_sum * mag
             total_mag += mag
             
-        shared_if_sum = shared_if_sum / (total_mag + 1e-8)
+        eps = torch.finfo(get_float_dtype(self.dtype_idx)).eps
+        shared_if_sum = torch.where(
+            total_mag.abs() > eps,
+            shared_if_sum / total_mag,
+            torch.zeros_like(shared_if_sum),
+        )
 
         # 3. 통합된 재배치 인덱스 생성
         if_min = shared_if_sum.min(dim=2, keepdim=True)[0]
         if_max = shared_if_sum.max(dim=2, keepdim=True)[0]
-        if_norm = (shared_if_sum - if_min) / (if_max - if_min + 1e-6)
-        
+        if_den = if_max - if_min
+        if_norm = torch.where(
+            if_den.abs() > eps,
+            (shared_if_sum - if_min) / if_den,
+            torch.zeros_like(shared_if_sum - if_min)
+        )
+
         shared_reassigned_bins = torch.round(if_norm * (freq_bins - 1)).long()
         shared_reassigned_bins = torch.clamp(shared_reassigned_bins, 0, freq_bins - 1)
 
         # 4. 동일한 기준(shared_reassigned_bins)으로 모든 Z 일괄 Squeezing
         original_z_sum = reduce(lambda a, b: a + b, z_reshaped_s,
-            torch.zeros_like(z_reshaped_s[0]) # 역변환 가중치용 통합 Z
+            torch.zeros_like(z_reshaped_s[0], dtype=get_float_dtype(self.dtype_idx)) # 역변환 가중치용 통합 Z
         )
         
         def _squeeze(zrs: tuple[torch.Tensor, ...]):
             for z_res in zrs:
-                squeezed_z = torch.zeros_like(z_res)
+                squeezed_z = torch.zeros_like(z_res, dtype=get_complex_dtype(self.dtype_idx))
                 squeezed_z.scatter_add_(dim=2, index=shared_reassigned_bins, src=z_res)
                 yield squeezed_z.view(B, C_total, *spatial_shape)
 
@@ -97,17 +109,21 @@ class SynchronizedGenericSST[T: NonLearnableProcessorBase](NonLearnableSynchroni
         sync_cache[cache_key] = (shared_reassigned_bins, original_z_sum)
 
         return squeezed_zs
+    
+    def get_inverse_transform(self) -> 'InverseSynchronizedGenericSST[T, I]':
+        return InverseSynchronizedGenericSST[T, I](self.base_transform.get_inverse_transform(), self.dtype_idx, self.freq_dim_groups)
 
 
-class InverseSynchronizedGenericSST[I: NonLearnableProcessorBase](NonLearnableSynchronizedProcessorBase[SynchronizedGenericSSTCache]):
+class InverseSynchronizedGenericSST[T: InvertibleTransformsBase['I'], I: InvertibleTransformsBase[T]](NonLearnableSynchronizedProcessorBase[SynchronizedGenericSSTCache]):
     """
     동기화된 단일 캐시를 활용하여 신경망의 융합 출력 W를 역변환합니다.
     """
     @override
-    def __init__(self, base_inverse_transform: I, freq_dim_groups: int = 1):
+    def __init__(self, base_inverse_transform: I, dtype_idx: FPDTypeIdx, freq_dim_groups: int = 1):
         super().__init__()
-        self.base_inverse_transform = base_inverse_transform
+        self.base_inverse_transform: I = base_inverse_transform
         self.freq_dim_groups: int = freq_dim_groups
+        self.dtype_idx: FPDTypeIdx = dtype_idx
 
     @override
     def is_valid_input(self, z: torch.Tensor) -> bool:
@@ -121,11 +137,17 @@ class InverseSynchronizedGenericSST[I: NonLearnableProcessorBase](NonLearnableSy
         w_reshaped = w.view(B, self.freq_dim_groups, freq_bins, *spatial_shape)
 
         # 1. 융합 전 통합 Z의 Squeezed 합산 복원
-        original_squeezed = torch.zeros_like(original_z_sum)
+        original_squeezed = torch.zeros_like(original_z_sum, dtype=get_complex_dtype(self.dtype_idx))
         original_squeezed.scatter_add_(dim=2, index=shared_reassigned_bins, src=original_z_sum)
         
         # 2. 비율 가중치(Weight) 계산 
-        weight = original_z_sum / (torch.gather(original_squeezed, dim=2, index=shared_reassigned_bins) + 1e-8)
+        den = torch.gather(original_squeezed, dim=2, index=shared_reassigned_bins)
+        eps = torch.finfo(get_float_dtype(self.dtype_idx)).eps
+        weight = torch.where(
+            den.abs() > eps,
+            original_z_sum / den,
+            torch.zeros_like(original_z_sum),
+        )
 
         # 3. 융합 결과물 W 역분배 (Redistribution)
         gathered_w = torch.gather(w_reshaped, dim=2, index=shared_reassigned_bins)
@@ -142,11 +164,17 @@ class InverseSynchronizedGenericSST[I: NonLearnableProcessorBase](NonLearnableSy
     def transform(self, *ws: torch.Tensor, **caches: Unpack[SynchronizedGenericSSTCache]) -> tuple[torch.Tensor, ...]:
         sync_cache: Dict[str, Tuple[torch.Tensor, torch.Tensor]] = caches['sync_cache']
         cache_key: str = caches['cache_key']
-        if cache_key not in sync_cache:
+        if cache_key not in sync_cache.keys():
             raise RuntimeError(f"동기화 캐시({cache_key}) 누락. 전방 transform_multiple()이 선행되어야 합니다.")
 
         shared_reassigned_bins, original_z_sum = sync_cache.pop(cache_key)
         
-        return tuple(self._transform_each(w, shared_reassigned_bins, original_z_sum) for w in ws)
+        return tuple(map(lambda w: self._transform_each(w, shared_reassigned_bins, original_z_sum),ws))
+    
+    def get_inverse_transform(self) -> SynchronizedGenericSST[T, I]:
+        return SynchronizedGenericSST[T, I](self.base_inverse_transform.get_inverse_transform(), self.dtype_idx, self.freq_dim_groups)
+
+
+
 
         

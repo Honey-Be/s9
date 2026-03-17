@@ -13,6 +13,17 @@ except Exception:  # pragma: no cover
 from s9.base import ComplexActivationFunctionBase, get_complex_dtype, get_float_dtype, FPDTypeIdx
 from s9.activations.complex.stable_cardioid import StableComplexCardioid
 from s9.activations.complex.stable_modrelu import StableModReLU
+from s9.utils import complex_dropout
+
+class ComplexDropout(nn.Module):
+    def __init__(self, p: float = 0.5):
+        super().__init__()
+        if not (0.0 <= p <= 1.0):
+            raise ValueError(f"dropout probability must be in [0, 1], got {p}")
+        self.p: float = p
+    
+    def forward(self, z: torch.Tensor) -> torch.Tensor:
+        return complex_dropout(z,self.p,self.training)
 
 class S9SSMKernel(nn.Module):
     """
@@ -88,7 +99,7 @@ class S9Layer(nn.Module):
         
         self.output_linear: nn.Linear = nn.Linear(d_model, d_model, bias=False, dtype=get_complex_dtype(dtype_idx))
         self.activation = gen_activation(d_model, eps, dtype_idx)
-        self.dropout: nn.Dropout = nn.Dropout(0.1)
+        self.dropout: ComplexDropout = ComplexDropout(0.1)
 
     def forward(self, u: torch.Tensor) -> torch.Tensor:
         """
@@ -156,7 +167,12 @@ class S9Layer(nn.Module):
         y = y.permute(*permute_order)
         
         y = self.activation(y)
-        y = self.output_linear(y)
+        ydtype = y.dtype
+        if ydtype == get_complex_dtype(32):
+            with torch.amp.autocast(device_type=str(y.device)):
+                y = self.output_linear.to(dtype=torch.complex64)(y.to(dtype=torch.complex64)).to(dtype=ydtype)
+        else:
+            y = self.output_linear(y)
         y = self.dropout(y)
         
         # 다시 채널을 두 번째로 이동: (B, C, D1, ...)
