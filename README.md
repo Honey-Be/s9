@@ -25,16 +25,16 @@ S9은 최신 상태 공간 모델(SSM) 연구인 S4ND와 S7의 장점을 융합�
 
 ``` bash
 # CPU 백엔드
-pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
+pip install "s9[cpu] @ git+https://github.com/Honey-Be/s9.git@v0.3.0"
 
 # CUDA 12.6 백엔드
-pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
+pip install "s9[cu126] @ git+https://github.com/Honey-Be/s9.git@v0.3.0"
 
 # CUDA 12.8 백엔드
-pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
+pip install "s9[cu128] @ git+https://github.com/Honey-Be/s9.git@v0.3.0"
 
 # CUDA 13.0 백엔드
-pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.2.8"
+pip install "s9[cu130] @ git+https://github.com/Honey-Be/s9.git@v0.3.0"
 ```
 ## 🚀 S9 사용법 (Usage)
 1. **기본 모델 생성 (Classification Example)**
@@ -177,6 +177,94 @@ v0.2.8에서는 S9 계열에 대해 아래 예시 모델도 함께 제공됩니�
 
 이 예시들은 DOST 기반 복소수 전처리 뒤에 Multi-head S9 또는 Biaffine S9 백본을 쌓아 분류를 수행하는 최소 예제입니다.
 
+## 부록 5: Gated Delta S9/RS9 (`s9.contrib`)
+
+Gated DeltaNet(ICLR 2025, Songlin Yang et al.)의 내부 SSM을 S9/RS9로 교체한 실험적 레이어들입니다. 기존 Gated DeltaNet의 세 가지 근본적 한계를 해소합니다:
+
+| 한계 | 기존 Gated DeltaNet | Gated Delta S9/RS9 |
+|------|---------------------|---------------------|
+| 고정 크기 상태 | $S \in \mathbb{C}^{d_k \times d_v}$ | 상태 없음; SSM 커널이 입력 길이에 맞게 생성 |
+| Rank-2 전이 | $(I - \beta kk^\top) + \beta vk^\top$ | Full-rank SSM 커널 (N=64 지수 기저함수의 합) |
+| 스칼라 게이팅 | $\alpha \in \mathbb{R}$ | 위치별·채널별 full-tensor gate + 복소 동역학 |
+
+### 5-1. 핵심 수식
+
+입력 $u$에 대해:
+
+1. **Gate 생성**: $[\alpha, \beta] = \sigma(W_g \cdot g_{\text{in}})$, $z = W_z \cdot g_{\text{in}}$ (데이터 의존적)
+2. **Multi-head S9/RS9 컨볼루션**: $y = \sum_h \text{head}_h(u)$ (차원별 SSM 커널의 outer product → FFT 컨볼루션)
+3. **Gated Delta 결합**: $\text{combined} = \alpha \odot u + \beta \odot y$
+4. **출력 게이팅**: $\text{output} = \text{Norm}(\text{Activation}(W_{\text{out}} \cdot \text{combined})) \odot \text{SiLU}(z)$
+
+### 5-2. 제공되는 레이어
+
+* `s9.contrib.gated_delta_s9_modules.GatedDeltaS9Layer` — complex-valued, multi-head
+* `s9.contrib.gated_delta_s9_modules.BiaffineGatedDeltaS9Layer` — complex-valued, biaffine channel coupling
+* `s9.contrib.gated_delta_rs9_modules.GatedDeltaRS9Layer` — real-valued, multi-head
+* `s9.contrib.gated_delta_rs9_modules.BiaffineGatedDeltaRS9Layer` — real-valued, biaffine channel coupling
+
+### 5-3. 사용 예시
+
+```python
+import torch
+from s9.transforms.dost import DOST
+from s9.contrib.gated_delta_s9_modules import GatedDeltaS9Layer
+from s9.activations.complex.stable_modrelu import StableModReLU
+
+# 설정
+d_model = 64
+spatial_shape = (32, 32)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# 모듈 초기화
+dost = DOST(D=2)
+layer = GatedDeltaS9Layer(
+    d_model=d_model,
+    spatial_dims=2,
+    gen_activation=StableModReLU,
+    n_heads=4,
+    head_channels=(16,),  # 각 head의 latent channels
+    dtype_idx=64
+).to(device)
+
+# Forward Pass
+x = torch.randn(2, 3, 32, 32).to(device)
+z = dost(x)  # Real -> Complex (Channel Expansion)
+# z를 d_model 채널로 projection 후 사용
+```
+
+RS9(real-valued) 레이어는 DOST 전처리 없이 직접 사용할 수 있습니다:
+
+```python
+import torch
+from s9.contrib.gated_delta_rs9_modules import GatedDeltaRS9Layer
+from s9.activations.real.thash import ThASh
+
+def make_activation(d_model, eps, dtype_idx):
+    return ThASh()
+
+layer = GatedDeltaRS9Layer(
+    d_model=64,
+    spatial_dims=2,
+    gen_activation=make_activation,
+    n_heads=4,
+    head_channels=(16,),
+    dtype_idx=64
+)
+
+x = torch.randn(2, 64, 32, 32)
+y = layer(x)  # (2, 64, 32, 32)
+```
+
+### 5-4. 예시 분류 모델
+
+`s9.contrib.examples` 모듈에서 4개의 분류 모델 예시를 제공합니다:
+
+* `GatedDeltaS9ClassifierExample` — DOST + GatedDeltaS9Layer
+* `BiaffineGatedDeltaS9ClassifierExample` — DOST + BiaffineGatedDeltaS9Layer
+* `GatedDeltaRS9ClassifierExample` — GatedDeltaRS9Layer (DOST 없음)
+* `BiaffineGatedDeltaRS9ClassifierExample` — BiaffineGatedDeltaRS9Layer (DOST 없음)
+
 ## 📚 출처 및 참고 문헌 (References)
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.
 1. S4ND (Multidimensional SSM)
@@ -185,7 +273,10 @@ v0.2.8에서는 S9 계열에 대해 아래 예시 모델도 함께 제공됩니�
 2. S7 (Simplified SSM)
     * Wang, J., Zhu, W., Wang, P., Yu, X., Liu, L., & Saligrama, V. (2024). **S7: Simplified State Space Layers for Sequence Modeling**. *arXiv preprint arXiv:2410.03464*.
     * DOI: [10.48550/arXiv.2410.03464](https://doi.org/10.48550/arXiv.2410.03464)
-3. DOST (Discrete Orthogonal Stockwell Transform)
+3. Gated Delta Networks
+    * Yang, S., Kautz, J., & Hatamizadeh, A. (2025). **Gated Delta Networks: Improving Mamba2 with Delta Rule**. *ICLR 2025*. *arXiv preprint arXiv:2412.06464*.
+    * DOI: [10.48550/arXiv.2412.06464](https://doi.org/10.48550/arXiv.2412.06464)
+4. DOST (Discrete Orthogonal Stockwell Transform)
     * Wang, Y., & Orchard, J. (2009). Fast Discrete Orthogonal Stockwell Transform. IEEE Transactions on Signal Processing, 57(9), 3615-3625.
     * (Note: 본 프로젝트에서는 이를 다차원 딥러닝 파이프라인에 맞게 근사 및 최적화하여 구현한 버전을 사용합니다.)
 

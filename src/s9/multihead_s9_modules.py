@@ -255,7 +255,6 @@ class MultiheadS9LayerBase(nn.Module, Generic[H], ABC):
         )
         self.dropout: ComplexDropout = ComplexDropout(0.1)
 
-    @final
     def forward(self, u: torch.Tensor) -> torch.Tensor:
         spatial_shapes = u.shape[2:]
         if len(spatial_shapes) != self.spatial_dims:
