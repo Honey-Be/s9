@@ -13,6 +13,7 @@ except Exception:  # pragma: no cover
 
 from collections.abc import Sequence
 
+from s9._common.kernel_base import InitMode, Discretization
 from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype, get_float_dtype
 from s9.modules import ComplexDropout
 from s9.multihead_s9_modules import (
@@ -71,6 +72,8 @@ class GatedDeltaS9Layer(nn.Module):
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
         dropout_p: float = 0.1,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__()
         self.d_model: int = d_model
@@ -89,6 +92,8 @@ class GatedDeltaS9Layer(nn.Module):
                 spatial_dims=spatial_dims,
                 head_channels=ch,
                 dtype_idx=dtype_idx,
+                init_mode=init_mode,
+                discretization=discretization,
             )
             for ch in channels_list
         ])
@@ -180,6 +185,8 @@ class BiaffineGatedDeltaS9Layer(nn.Module):
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
         dropout_p: float = 0.1,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__()
         self.d_model: int = d_model
@@ -192,7 +199,8 @@ class BiaffineGatedDeltaS9Layer(nn.Module):
 
         # Biaffine S9 convolution heads
         channels_list = _normalize_head_channels(d_model, n_heads, latent_channels)
-        mapper = BiaffineS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim)
+        mapper = BiaffineS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim,
+                                            init_mode=init_mode, discretization=discretization)
         self.heads: nn.ModuleList = nn.ModuleList([
             mapper.mapping(ch, dtype_idx)
             for ch in channels_list

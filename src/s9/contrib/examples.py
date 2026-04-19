@@ -287,3 +287,78 @@ class BiaffineGatedDeltaRS9ClassifierExample(_RS9ClassifierBase):
             )
             for _ in range(n_layers)
         ])
+
+
+# ---------------------------------------------------------------------------
+# ARS9 Gated Delta classifier examples
+# ---------------------------------------------------------------------------
+
+from s9.contrib.gated_delta_ars9_modules import GatedDeltaARS9Layer, BiaffineGatedDeltaARS9Layer
+
+
+class GatedDeltaARS9ClassifierExample(_RS9ClassifierBase):
+    """Example classifier using GatedDeltaARS9Layer backbone.
+
+    Flow: Input (Real) -> Projection -> Stack of Gated Delta ARS9 Layers
+          -> Global Pooling -> Classifier
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        d_model: int,
+        n_layers: int,
+        n_heads: int,
+        num_classes: int,
+        spatial_shape: Tuple[int, ...],
+        dtype_idx: FPDTypeIdx = 64,
+        eps: float = 1e-6,
+    ):
+        super().__init__(in_channels, d_model, num_classes, spatial_shape, dtype_idx)
+        self.layers = nn.ModuleList([
+            GatedDeltaARS9Layer(
+                d_model=d_model,
+                spatial_dims=self.D,
+                gen_activation=_make_rs9_activation,
+                n_heads=n_heads,
+                head_channels=(in_channels,),
+                eps=eps,
+                dtype_idx=dtype_idx,
+            )
+            for _ in range(n_layers)
+        ])
+
+
+class BiaffineGatedDeltaARS9ClassifierExample(_RS9ClassifierBase):
+    """Example classifier using BiaffineGatedDeltaARS9Layer backbone.
+
+    Flow: Input (Real) -> Projection -> Stack of Biaffine Gated Delta ARS9 Layers
+          -> Global Pooling -> Classifier
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        d_model: int,
+        n_layers: int,
+        n_heads: int,
+        num_classes: int,
+        spatial_shape: Tuple[int, ...],
+        channel_embed_dim: int = 16,
+        dtype_idx: FPDTypeIdx = 64,
+        eps: float = 1e-6,
+    ):
+        super().__init__(in_channels, d_model, num_classes, spatial_shape, dtype_idx)
+        self.layers = nn.ModuleList([
+            BiaffineGatedDeltaARS9Layer(
+                d_model=d_model,
+                spatial_dims=self.D,
+                gen_activation=_make_rs9_activation,
+                n_heads=n_heads,
+                latent_channels=(in_channels,),
+                channel_embed_dim=channel_embed_dim,
+                eps=eps,
+                dtype_idx=dtype_idx,
+            )
+            for _ in range(n_layers)
+        ])

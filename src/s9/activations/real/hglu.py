@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from s9.activations.real.base import RealActivationBase
+
 
 def hglu(input: torch.Tensor, k: float) -> torch.Tensor:
     """
@@ -15,7 +17,7 @@ def hglu(input: torch.Tensor, k: float) -> torch.Tensor:
     return (input + torch.sqrt(k + input * input)) / 2
 
 
-class HGLU(nn.Module):
+class HGLU(RealActivationBase):
     r"""
     HGLU_k(Hyperbolic Gain Linear Unit with positive hyperparameter k) activation
 

@@ -12,7 +12,7 @@ except Exception:  # pragma: no cover
     from typing_extensions import override  # type: ignore
 
 from s9.base import FPDTypeIdx, get_float_dtype
-from s9.rs9_modules import RS9SSMKernel
+from s9.ars9_modules import ARS9SSMKernel
 from s9._common.kernel_base import InitMode, Discretization
 
 from collections.abc import Sequence
@@ -29,19 +29,19 @@ __all__ = [
     "_rfftn_convolve_nd",
     "_apply_channel_last_linear_and_activation",
     "HeadMapperBase",
-    "MultiheadRS9HeadBase",
-    "MultiheadRS9Head",
-    "MultiheadRS9LayerBase",
-    "MultiheadRS9Layer",
+    "MultiheadARS9HeadBase",
+    "MultiheadARS9Head",
+    "MultiheadARS9LayerBase",
+    "MultiheadARS9Layer",
 ]
 
 
-class MultiheadRS9HeadBase(nn.Module, ABC):
+class MultiheadARS9HeadBase(nn.Module, ABC):
     class _Prepare(ABC):
         @abstractmethod
-        def __init__(self, head_ref: "MultiheadRS9HeadBase") -> None:
+        def __init__(self, head_ref: "MultiheadARS9HeadBase") -> None:
             super().__init__()
-            self.head_ref: MultiheadRS9HeadBase = head_ref
+            self.head_ref: MultiheadARS9HeadBase = head_ref
 
         @abstractmethod
         def preprocess(self, u: torch.Tensor) -> torch.Tensor:
@@ -67,8 +67,8 @@ class MultiheadRS9HeadBase(nn.Module, ABC):
         self.channels: int = channels
         self.dtype_idx: FPDTypeIdx = dtype_idx
         self.kernels: nn.ModuleList = nn.ModuleList(
-            [RS9SSMKernel(channels, L=None, dtype_idx=dtype_idx,
-                          init_mode=init_mode, discretization=discretization)
+            [ARS9SSMKernel(channels, L=None, dtype_idx=dtype_idx,
+                           init_mode=init_mode, discretization=discretization)
              for _ in range(spatial_dims)]
         )
 
@@ -89,8 +89,8 @@ class MultiheadRS9HeadBase(nn.Module, ABC):
         return preparation.postprocess(y_latent)
 
 
-class MultiheadRS9Head(MultiheadRS9HeadBase):
-    """One real-valued head for MultiheadRS9Layer."""
+class MultiheadARS9Head(MultiheadARS9HeadBase):
+    """One real-valued head for MultiheadARS9Layer."""
 
     @override
     def __init__(
@@ -110,11 +110,11 @@ class MultiheadRS9Head(MultiheadRS9HeadBase):
         self.permute_order: list[int] = [0] + list(range(2, 2 + self.spatial_dims)) + [1]
         self.inv_permute_order: list[int] = [0, self.spatial_dims + 1] + list(range(1, 1 + self.spatial_dims))
 
-    class _Prepare(MultiheadRS9HeadBase._Prepare):
+    class _Prepare(MultiheadARS9HeadBase._Prepare):
         @override
-        def __init__(self, head_ref: "MultiheadRS9Head") -> None:
+        def __init__(self, head_ref: "MultiheadARS9Head") -> None:
             super().__init__(head_ref)
-            self.head_ref: MultiheadRS9Head = head_ref
+            self.head_ref: MultiheadARS9Head = head_ref
 
         @override
         def preprocess(self, u: torch.Tensor) -> torch.Tensor:
@@ -129,11 +129,11 @@ class MultiheadRS9Head(MultiheadRS9HeadBase):
             return out.permute(*self.head_ref.inv_permute_order)
 
     @override
-    def _prepare(self) -> MultiheadRS9Head._Prepare:
-        return MultiheadRS9Head._Prepare(head_ref=self)
+    def _prepare(self) -> MultiheadARS9Head._Prepare:
+        return MultiheadARS9Head._Prepare(head_ref=self)
 
 
-H = TypeVar("H", bound=MultiheadRS9HeadBase)
+H = TypeVar("H", bound=MultiheadARS9HeadBase)
 
 
 class HeadMapperBase(Generic[H], ABC):
@@ -142,11 +142,11 @@ class HeadMapperBase(Generic[H], ABC):
         raise NotImplementedError
 
 
-class MultiheadRS9LayerBase(nn.Module, Generic[H], ABC):
-    """Multi-head generalization of RS9Layer.
+class MultiheadARS9LayerBase(nn.Module, Generic[H], ABC):
+    """Multi-head generalization of ARS9Layer.
 
     Relationship to the existing hierarchy:
-        RS9Layer -> MultiheadRS9Layer -> BiaffineRS9Layer
+        ARS9Layer -> MultiheadARS9Layer -> BiaffineARS9Layer
     """
 
     @staticmethod
@@ -208,14 +208,14 @@ class MultiheadRS9LayerBase(nn.Module, Generic[H], ABC):
         )
 
 
-class MultiheadRS9Layer(MultiheadRS9LayerBase[MultiheadRS9Head]):
-    """Multi-head generalization of RS9Layer.
+class MultiheadARS9Layer(MultiheadARS9LayerBase[MultiheadARS9Head]):
+    """Multi-head generalization of ARS9Layer.
 
     Relationship to the existing hierarchy:
-        RS9Layer -> MultiheadRS9Layer -> BiaffineRS9Layer
+        ARS9Layer -> MultiheadARS9Layer -> BiaffineARS9Layer
     """
 
-    class HeadMapper(HeadMapperBase[MultiheadRS9Head]):
+    class HeadMapper(HeadMapperBase[MultiheadARS9Head]):
         def __init__(self, d_model: int, spatial_dims: int,
                      init_mode: InitMode = "legacy",
                      discretization: Discretization = "zoh") -> None:
@@ -226,8 +226,8 @@ class MultiheadRS9Layer(MultiheadRS9LayerBase[MultiheadRS9Head]):
             self.discretization: Discretization = discretization
 
         @override
-        def mapping(self, ch: int, dtype_idx: FPDTypeIdx) -> MultiheadRS9Head:
-            return MultiheadRS9Head(
+        def mapping(self, ch: int, dtype_idx: FPDTypeIdx) -> MultiheadARS9Head:
+            return MultiheadARS9Head(
                 d_model=self.d_model,
                 spatial_dims=self.spatial_dims,
                 head_channels=ch,
@@ -254,7 +254,7 @@ class MultiheadRS9Layer(MultiheadRS9LayerBase[MultiheadRS9Head]):
             spatial_dims,
             gen_activation,
             n_heads,
-            MultiheadRS9Layer.HeadMapper(d_model, spatial_dims, init_mode, discretization),
+            MultiheadARS9Layer.HeadMapper(d_model, spatial_dims, init_mode, discretization),
             eps,
             dtype_idx,
             head_channels,

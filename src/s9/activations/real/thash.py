@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from s9.activations.real.base import RealActivationBase
+
 
 def thash(input: torch.Tensor) -> torch.Tensor:
     """
@@ -13,7 +15,7 @@ def thash(input: torch.Tensor) -> torch.Tensor:
     return input / torch.sqrt(1 + input * input)
 
 
-class ThASh(nn.Module):
+class ThASh(RealActivationBase):
     r"""
     ThASh(TanhArSinh) activation.
 

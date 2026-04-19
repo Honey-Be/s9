@@ -10,6 +10,7 @@ try:
 except Exception:  # pragma: no cover
     from typing_extensions import override  # type: ignore
 
+from s9._common.kernel_base import InitMode, Discretization
 from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype
 from s9.multihead_s9_modules import HeadMapperBase, MultiheadS9HeadBase, MultiheadS9LayerBase
 
@@ -95,12 +96,16 @@ class BiaffineS9Head(MultiheadS9HeadBase):
         latent_channels: int,
         channel_embed_dim: int,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__(
             d_model=d_model,
             spatial_dims=spatial_dims,
             channels=latent_channels,
             dtype_idx=dtype_idx,
+            init_mode=init_mode,
+            discretization=discretization,
         )
         self.mixer: ComplexBiaffineChannelMixer = ComplexBiaffineChannelMixer(
             d_model=d_model,
@@ -137,11 +142,15 @@ class BiaffineS9Layer(MultiheadS9LayerBase[BiaffineS9Head]):
     """
 
     class HeadMapper(HeadMapperBase[BiaffineS9Head]):
-        def __init__(self, d_model: int, spatial_dims: int, channel_embed_dim: int) -> None:
+        def __init__(self, d_model: int, spatial_dims: int, channel_embed_dim: int,
+                     init_mode: InitMode = "legacy",
+                     discretization: Discretization = "zoh") -> None:
             super().__init__()
             self.d_model: int = d_model
             self.spatial_dims: int = spatial_dims
             self.channel_embed_dim: int = channel_embed_dim
+            self.init_mode: InitMode = init_mode
+            self.discretization: Discretization = discretization
 
         @override
         def mapping(self, ch: int, dtype_idx: FPDTypeIdx) -> BiaffineS9Head:
@@ -151,6 +160,8 @@ class BiaffineS9Layer(MultiheadS9LayerBase[BiaffineS9Head]):
                 latent_channels=ch,
                 channel_embed_dim=self.channel_embed_dim,
                 dtype_idx=dtype_idx,
+                init_mode=self.init_mode,
+                discretization=self.discretization,
             )
 
     def __init__(
@@ -163,14 +174,19 @@ class BiaffineS9Layer(MultiheadS9LayerBase[BiaffineS9Head]):
         channel_embed_dim: int = 16,
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__(
             d_model=d_model,
             spatial_dims=spatial_dims,
             gen_activation=gen_activation,
             n_heads=n_heads,
-            mapper=BiaffineS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim),
+            mapper=BiaffineS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim,
+                                              init_mode, discretization),
             channels=latent_channels,
             eps=eps,
             dtype_idx=dtype_idx,
+            init_mode=init_mode,
+            discretization=discretization,
         )

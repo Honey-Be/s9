@@ -13,8 +13,15 @@ except Exception:  # pragma: no cover
 
 from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype
 from s9.modules import S9SSMKernel, ComplexDropout
+from s9._common.kernel_base import InitMode, Discretization
 
 from collections.abc import Sequence
+
+# Re-export from _common for backward compatibility
+from s9._common.head_mixing import normalize_head_channels as _normalize_head_channels
+from s9._common.outer_product import build_outer_product_global_kernel as _build_outer_product_global_kernel
+from s9._common.fft_conv import fftn_convolve_nd as _fftn_convolve_nd
+from s9._common.head_mixing import apply_channel_last_pointwise as _apply_channel_last_linear_and_activation
 
 __all__ = [
     "_normalize_head_channels",
@@ -27,89 +34,6 @@ __all__ = [
     "MultiheadS9LayerBase",
     "MultiheadS9Layer",
 ]
-
-
-def _normalize_head_channels(d_model: int, n_heads: int, head_channels: Sequence[int]) -> list[int]:
-    if n_heads <= 0:
-        raise ValueError(f"n_heads must be positive, got {n_heads}")
-
-    if len(head_channels) == 0:
-        if d_model % n_heads != 0:
-            raise ValueError(
-                f"d_model={d_model} must be divisible by n_heads={n_heads} when head_channels is omitted"
-            )
-        return [d_model // n_heads] * n_heads
-
-    if len(head_channels) == 1:
-        ch = int(head_channels[0])
-        if ch <= 0:
-            raise ValueError(f"head_channels must be positive, got {head_channels[0]}")
-        return [ch] * n_heads
-
-    if len(head_channels) != n_heads:
-        raise ValueError(f"Expected {n_heads} head channel sizes, got {len(head_channels)}")
-
-    channels_list = [int(ch) for ch in head_channels]
-    if any(ch <= 0 for ch in channels_list):
-        raise ValueError("All head channel sizes must be positive")
-    return channels_list
-
-
-
-def _build_outer_product_global_kernel(
-    kernels_1d: Sequence[torch.Tensor],
-    spatial_shapes: Sequence[int],
-    channels: int,
-) -> torch.Tensor:
-    if len(kernels_1d) != len(spatial_shapes):
-        raise ValueError(
-            f"kernels_1d and spatial_shapes must have the same length, got {len(kernels_1d)} and {len(spatial_shapes)}"
-        )
-
-    k_global = kernels_1d[0]
-    view_shape = [channels] + [1] * len(spatial_shapes)
-    view_shape[1] = spatial_shapes[0]
-    k_global = k_global.view(*view_shape)
-
-    for dim_idx in range(1, len(spatial_shapes)):
-        next_view_shape = [channels] + [1] * len(spatial_shapes)
-        next_view_shape[dim_idx + 1] = spatial_shapes[dim_idx]
-        k_global = k_global * kernels_1d[dim_idx].view(*next_view_shape)
-
-    return k_global
-
-
-
-def _fftn_convolve_nd(u: torch.Tensor, k_global: torch.Tensor, spatial_dims: int) -> torch.Tensor:
-    spatial_shapes = u.shape[2:]
-    padded_shapes = [size * 2 for size in spatial_shapes]
-    fft_dims = tuple(range(-spatial_dims, 0))
-
-    u_f = torch.fft.fftn(u, s=padded_shapes, dim=fft_dims)
-    k_f = torch.fft.fftn(k_global, s=padded_shapes, dim=fft_dims)
-    y_f = u_f * k_f
-    y = torch.fft.ifftn(y_f, s=padded_shapes, dim=fft_dims)
-
-    slices = [slice(None)] * 2 + [slice(0, size) for size in spatial_shapes]
-    return y[tuple(slices)]
-
-
-
-def _apply_channel_last_linear_and_activation(
-    y: torch.Tensor,
-    spatial_dims: int,
-    activation: nn.Module,
-    output_linear: nn.Linear,
-    dropout: ComplexDropout,
-) -> torch.Tensor:
-    permute_order = [0] + list(range(2, 2 + spatial_dims)) + [1]
-    inv_permute_order = [0, spatial_dims + 1] + list(range(1, 1 + spatial_dims))
-
-    y = y.permute(*permute_order)
-    y = activation(y)
-    y = output_linear(y)
-    y = dropout(y)
-    return y.permute(*inv_permute_order)
 
 
 class MultiheadS9HeadBase(nn.Module, ABC):
@@ -134,6 +58,8 @@ class MultiheadS9HeadBase(nn.Module, ABC):
         spatial_dims: int,
         channels: int,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__()
         self.d_model: int = d_model
@@ -141,7 +67,9 @@ class MultiheadS9HeadBase(nn.Module, ABC):
         self.channels: int = channels
         self.dtype_idx: FPDTypeIdx = dtype_idx
         self.kernels: nn.ModuleList = nn.ModuleList(
-            [S9SSMKernel(channels, L=None, dtype_idx=dtype_idx) for _ in range(spatial_dims)]
+            [S9SSMKernel(channels, L=None, dtype_idx=dtype_idx,
+                         init_mode=init_mode, discretization=discretization)
+             for _ in range(spatial_dims)]
         )
 
     @abstractmethod
@@ -171,8 +99,11 @@ class MultiheadS9Head(MultiheadS9HeadBase):
         spatial_dims: int,
         head_channels: int,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
-        super().__init__(d_model=d_model, spatial_dims=spatial_dims, channels=head_channels, dtype_idx=dtype_idx)
+        super().__init__(d_model=d_model, spatial_dims=spatial_dims, channels=head_channels,
+                         dtype_idx=dtype_idx, init_mode=init_mode, discretization=discretization)
         c_dtype = get_complex_dtype(dtype_idx)
         self.input_linear: nn.Linear = nn.Linear(d_model, head_channels, bias=False, dtype=c_dtype)
         self.output_linear: nn.Linear = nn.Linear(head_channels, d_model, bias=False, dtype=c_dtype)
@@ -240,6 +171,8 @@ class MultiheadS9LayerBase(nn.Module, Generic[H], ABC):
         channels: Sequence[int],
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__()
         self.d_model: int = d_model
@@ -283,10 +216,14 @@ class MultiheadS9Layer(MultiheadS9LayerBase[MultiheadS9Head]):
     """
 
     class HeadMapper(HeadMapperBase[MultiheadS9Head]):
-        def __init__(self, d_model: int, spatial_dims: int) -> None:
+        def __init__(self, d_model: int, spatial_dims: int,
+                     init_mode: InitMode = "legacy",
+                     discretization: Discretization = "zoh") -> None:
             super().__init__()
             self.d_model: int = d_model
             self.spatial_dims: int = spatial_dims
+            self.init_mode: InitMode = init_mode
+            self.discretization: Discretization = discretization
 
         @override
         def mapping(self, ch: int, dtype_idx: FPDTypeIdx) -> MultiheadS9Head:
@@ -295,6 +232,8 @@ class MultiheadS9Layer(MultiheadS9LayerBase[MultiheadS9Head]):
                 spatial_dims=self.spatial_dims,
                 head_channels=ch,
                 dtype_idx=dtype_idx,
+                init_mode=self.init_mode,
+                discretization=self.discretization,
             )
 
     @override
@@ -307,14 +246,18 @@ class MultiheadS9Layer(MultiheadS9LayerBase[MultiheadS9Head]):
         head_channels: Sequence[int],
         eps: float = 1e-6,
         dtype_idx: FPDTypeIdx = 64,
+        init_mode: InitMode = "legacy",
+        discretization: Discretization = "zoh",
     ) -> None:
         super().__init__(
             d_model=d_model,
             spatial_dims=spatial_dims,
             gen_activation=gen_activation,
             n_heads=n_heads,
-            mapper=MultiheadS9Layer.HeadMapper(d_model, spatial_dims),
+            mapper=MultiheadS9Layer.HeadMapper(d_model, spatial_dims, init_mode, discretization),
             channels=head_channels,
             eps=eps,
             dtype_idx=dtype_idx,
+            init_mode=init_mode,
+            discretization=discretization,
         )

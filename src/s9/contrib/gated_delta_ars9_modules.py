@@ -15,24 +15,25 @@ from collections.abc import Sequence
 
 from s9._common.kernel_base import InitMode, Discretization
 from s9.base import FPDTypeIdx, get_float_dtype
-from s9.multihead_rs9_modules import (
-    MultiheadRS9Head,
+from s9.multihead_ars9_modules import (
+    MultiheadARS9Head,
+    HeadMapperBase,
     _normalize_head_channels,
 )
-from s9.biaffine_rs9_modules import BiaffineRS9Head, BiaffineRS9Layer
+from s9.biaffine_ars9_modules import BiaffineARS9Head, BiaffineARS9Layer
 
 
 __all__ = [
-    "GatedDeltaRS9Layer",
-    "BiaffineGatedDeltaRS9Layer",
+    "GatedDeltaARS9Layer",
+    "BiaffineGatedDeltaARS9Layer",
 ]
 
 
-class GatedDeltaRS9Layer(nn.Module):
-    """Gated Delta RS9 Layer: RS9-based redesign of Gated DeltaNet (real-valued, multi-head).
+class GatedDeltaARS9Layer(nn.Module):
+    """Gated Delta ARS9 Layer: ARS9-based redesign of Gated DeltaNet (real-valued, multi-head).
 
     Replaces Gated DeltaNet's token-level rank-2 recurrence with multi-head
-    RS9 FFT convolution, eliminating fixed-size state, rank-2 transition,
+    ARS9 FFT convolution, eliminating fixed-size state, rank-2 transition,
     and scalar gating constraints.
     """
 
@@ -57,10 +58,10 @@ class GatedDeltaRS9Layer(nn.Module):
 
         f_dtype = get_float_dtype(dtype_idx)
 
-        # Multi-head RS9 convolution heads
+        # Multi-head ARS9 convolution heads
         channels_list = _normalize_head_channels(d_model, n_heads, head_channels)
         self.heads: nn.ModuleList = nn.ModuleList([
-            MultiheadRS9Head(
+            MultiheadARS9Head(
                 d_model=d_model,
                 spatial_dims=spatial_dims,
                 head_channels=ch,
@@ -111,7 +112,7 @@ class GatedDeltaRS9Layer(nn.Module):
         alpha, beta = torch.sigmoid(gate_logits).chunk(2, dim=-1)
         z = self.z_proj(gate_input)
 
-        # Step 2: Multi-head RS9 convolution
+        # Step 2: Multi-head ARS9 convolution
         y = torch.zeros_like(u)
         for head in self.heads:
             y = y + head(u)
@@ -129,11 +130,11 @@ class GatedDeltaRS9Layer(nn.Module):
         return combined.permute(*inv_permute_order)
 
 
-class BiaffineGatedDeltaRS9Layer(nn.Module):
-    """Biaffine Gated Delta RS9 Layer: RS9-based redesign of Gated DeltaNet
+class BiaffineGatedDeltaARS9Layer(nn.Module):
+    """Biaffine Gated Delta ARS9 Layer: ARS9-based redesign of Gated DeltaNet
     with biaffine channel coupling (real-valued).
 
-    Uses BiaffineRS9Head for richer input-output channel interactions
+    Uses BiaffineARS9Head for richer input-output channel interactions
     via low-rank biaffine channel mixing.
     """
 
@@ -159,10 +160,10 @@ class BiaffineGatedDeltaRS9Layer(nn.Module):
 
         f_dtype = get_float_dtype(dtype_idx)
 
-        # Biaffine RS9 convolution heads
+        # Biaffine ARS9 convolution heads
         channels_list = _normalize_head_channels(d_model, n_heads, latent_channels)
-        mapper = BiaffineRS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim,
-                                             init_mode=init_mode, discretization=discretization)
+        mapper = BiaffineARS9Layer.HeadMapper(d_model, spatial_dims, channel_embed_dim,
+                                              init_mode=init_mode, discretization=discretization)
         self.heads: nn.ModuleList = nn.ModuleList([
             mapper.mapping(ch, dtype_idx)
             for ch in channels_list
@@ -208,7 +209,7 @@ class BiaffineGatedDeltaRS9Layer(nn.Module):
         alpha, beta = torch.sigmoid(gate_logits).chunk(2, dim=-1)
         z = self.z_proj(gate_input)
 
-        # Step 2: Multi-head biaffine RS9 convolution
+        # Step 2: Multi-head biaffine ARS9 convolution
         y = torch.zeros_like(u)
         for head in self.heads:
             y = y + head(u)
