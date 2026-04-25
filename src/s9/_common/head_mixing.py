@@ -6,16 +6,22 @@ import torch
 import torch.nn as nn
 
 
-def normalize_head_channels(d_model: int, n_heads: int, head_channels: Sequence[int]) -> list[int]:
+def normalize_head_channels(d_model: int, n_heads: int, head_channels: Sequence[int] | int) -> list[int]:
     """Resolve per-head channel counts from user-supplied shorthand.
 
     Rules:
+        * ``head_channels`` is an ``int`` → ``[head_channels]`` (single-value shorthand).
         * ``head_channels == []`` → ``d_model // n_heads`` for every head.
         * ``head_channels == [ch]`` → *ch* for every head.
         * ``len(head_channels) == n_heads`` → use as-is.
     """
     if n_heads <= 0:
         raise ValueError(f"n_heads must be positive, got {n_heads}")
+
+    # Accept bare int as single-element shorthand (used by BiaffineRS9Layer
+    # which passes latent_channels: int as channels to the parent).
+    if isinstance(head_channels, int):
+        head_channels = [head_channels]
 
     if len(head_channels) == 0:
         if d_model % n_heads != 0:
