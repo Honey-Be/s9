@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Literal, final
+from typing import Literal, final, Self
 
 import torch
 import torch.nn as nn

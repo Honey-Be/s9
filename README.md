@@ -433,6 +433,11 @@ y = layer(x)  # Quantized forward pass
 
 ---
 
+## 부록 8: Warped DOST - Inverse Warped DOST 변환쌍
+[README-WARPED-DOST.md](./README-WARPED-DOST.md) 문서 참조.
+
+---
+
 ## 출처 및 참고 문헌 (References)
 
 이 프로젝트는 다음의 연구 논문들에 기반하여 구현되었습니다.
