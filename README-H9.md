@@ -148,7 +148,6 @@ The following are deliberately deferred — see `DESIGN-H9.md` §12:
 2. S9 main README — for shared infrastructure (DOST, complex activations, etc.)
 3. `README-WARPED-DOST.md` — for the calibration workflow underlying h9.
 4. `DESIGN-H9.md` — full technical spec.
-5. `CLAUDE.md` — implementation conventions for Claude Code.
 
 ## License
 
