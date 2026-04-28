@@ -1464,8 +1464,9 @@ cpu = ["torch", "torch", "torch", "torch"]
 cu126 = ["torch", "torch", "torch", "torch"]
 cu128 = ["torch", "torch", "torch", "torch"]
 cu130 = ["torch", "torch", "torch", "torch"]
+h9 = []
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <3.15"
-content-hash = "defa7ba97f494872398df8cc3a7b93ee4e59eca272e9efdf29e7ecb2a3928e7e"
+content-hash = "19131ee99dec49286ee20770c205a2a76c73fcb66acebfc342cf38a701e5d918"
