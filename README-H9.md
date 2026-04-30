@@ -20,8 +20,9 @@ images are processed end-to-end as multidimensional signals.
 
 ```
 X ──► Stem(1×1) ──► Warped DOST ──► [ HSS Block ] × L ──► Inverse DOST ──► GAP ──► Linear ──► ŷ
-                    (calibrated)     ↑                                                          
-                                     ╰── shape: (B, D', H, W) complex throughout
+                    (calibrated)     ↑                      │
+                                     ╰── (B, D', H, W)     ╰── (B, D, H, W)
+                                         complex throughout      backbone output
 ```
 
 Each HSS block: `Dual-Project ► Phase-Aware SPN ► Spectral Kernel ► SAGU ► Out-Gate ► FFN`,
@@ -78,6 +79,54 @@ f.finalize()
 logits = model(x_64)              # works without any retraining
 ```
 
+### Backbone-only usage (without classifier head)
+
+`H9ClassifierModelExample` is a convenience wrapper. For tasks other than
+classification (detection, segmentation, feature extraction, etc.), compose
+the building blocks directly:
+
+```python
+import torch
+from torch import nn
+from s9.transforms.warped_dost import WarpedDOST
+from s9.h9 import HSSBlock
+
+class H9Backbone(nn.Module):
+    def __init__(self, in_channels=3, d_model=64, n_layers=8, n_per_axis=3):
+        super().__init__()
+        self.d_model = d_model
+        self.d_prime = d_model * n_per_axis ** 2
+
+        self.stem = nn.Conv2d(in_channels, d_model, 1)
+        self.dost = WarpedDOST(D=2, n_per_axis=n_per_axis)
+        self.blocks = nn.ModuleList([
+            HSSBlock(d_model=d_model, n_per_axis=n_per_axis)
+            for _ in range(n_layers)
+        ])
+
+    def calibrate(self, x):
+        with torch.no_grad():
+            self.dost.fit(self.stem(x))
+
+    def forward(self, x):
+        u = self.stem(x)                           # (B, D, H, W) real
+        z = self.dost(u)                           # (B, D', H, W) complex
+        for block in self.blocks:
+            z = block(z)                           # shape preserved
+        inv = self.dost.get_inverse_transform()
+        return inv(z)                              # (B, D, H, W) real
+```
+
+The output is a spatial feature map of shape `(B, D, H, W)` — attach any
+downstream head without going through GAP. The key point: **Inverse DOST
+collapses `D'` back to `D`**, so the head sees the original channel dim,
+not the expanded one.
+
+For tasks that benefit from multi-scale spectral features, you can also
+skip the Inverse DOST and work directly in the DOST coefficient domain
+`(B, D', H, W)` complex — but note that downstream modules must then
+handle complex tensors.
+
 ### Streaming calibration (memory-constrained)
 
 ```python
@@ -101,7 +150,10 @@ Buffer size is `O(H + W)` floats — independent of dataset size.
 | `s9.h9.ComplexLayerNorm` | Magnitude-based LN preserving phase | DESIGN-H9 §5.3 |
 | `s9.h9.ComplexFFN` | Two-layer MLP, channel-only | DESIGN-H9 §5.4 |
 | `s9.h9.DualAttribution` | Non-intrusive attribution capture | DESIGN-H9 §8 |
-| `s9.h9.examples.H9ClassifierModelExample` | End-to-end classifier | DESIGN-H9 §2 |
+| `s9.h9.examples.H9ClassifierModelExample` | End-to-end classifier (GAP + Linear head) | DESIGN-H9 §2 |
+
+For backbone-only usage (detection, segmentation, etc.), compose `WarpedDOST` +
+`HSSBlock` directly — see [Backbone-only usage](#backbone-only-usage-without-classifier-head) above.
 
 ## Resolution invariance — what it means and what it doesn't
 

@@ -9,7 +9,6 @@ def complex_dropout(z: torch.Tensor, p: float = 0.5, training: bool = True) -> t
         return z
     if p == 1.0:
         return torch.zeros_like(z)
-    q: float = 1.0 - p
     # real-valued mask with the same complex-element shape
     if z.is_complex():
         mask: torch.Tensor = F.dropout(torch.ones_like(z.real), p=p, training=training)

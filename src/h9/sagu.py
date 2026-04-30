@@ -5,10 +5,11 @@ All mixing is channel-only; spatial dims are broadcast.
 
 Mathematical specification::
 
-    SAGU(U_tilde) = (U_tilde W_1) * sigmoid(|U_tilde| W_2 + b_2)
+    SAGU(U_tilde) = (U_tilde W_1) * gate_act(|U_tilde| W_2 + b_2)
 
-where ``W_1 in C^{D' x D'}`` (complex linear branch) and
-``W_2 in R^{D' x D'}`` (real, from magnitudes), ``b_2 in R^{D'}``.
+where ``W_1 in C^{D' x D'}`` (complex linear branch),
+``W_2 in R^{D' x D'}`` (real, from magnitudes), ``b_2 in R^{D'}``,
+and ``gate_act`` is a configurable real-valued activation (default sigmoid).
 """
 
 from __future__ import annotations
@@ -26,6 +27,9 @@ class DOSTDomainSAGU(nn.Module):
     ----------
     d_prime : int
         Channel dimension after Warped DOST.
+    gen_gate_activation : type[nn.Module] | None
+        Factory for the magnitude-gate activation. Must accept real input and
+        produce real output. Default ``nn.Sigmoid``.
     eps : float
         Numerical epsilon. Default ``1e-8``.
 
@@ -33,12 +37,26 @@ class DOSTDomainSAGU(nn.Module):
     --------------
     Input  : ``U_tilde`` of shape ``(B, d_prime, H, W)`` complex.
     Output : same shape, complex.
+
+    Notes
+    -----
+    The gate activation receives **real-valued** input (post-linear magnitudes)
+    and must return real output. Complex-valued activations must NOT be used here.
     """
 
-    def __init__(self, d_prime: int, eps: float = 1e-8) -> None:
+    def __init__(
+        self,
+        d_prime: int,
+        gen_gate_activation: type[nn.Module] | None = None,
+        eps: float = 1e-8,
+    ) -> None:
         super().__init__()
         self.d_prime = d_prime
         self.eps = eps
+
+        if gen_gate_activation is None:
+            gen_gate_activation = nn.Sigmoid
+        self.gate_activation = gen_gate_activation()
 
         # Complex linear branch (separate real/imag)
         self.W_1_re = nn.Parameter(torch.empty(d_prime, d_prime))
@@ -76,7 +94,7 @@ class DOSTDomainSAGU(nn.Module):
 
         # Magnitude gate (real)
         m = U_tilde.abs()
-        gate = torch.sigmoid(
+        gate = self.gate_activation(
             torch.einsum("bchw,cd->bdhw", m, self.W_2)
             + self.b_2.view(1, -1, 1, 1)
         )

@@ -29,6 +29,9 @@ class SASS(nn.Module):
     ----------
     d_prime : int
         Channel dimension after Warped DOST.
+    gen_gate_activation : type[nn.Module] | None
+        Factory for the SAGU magnitude-gate activation (real → real).
+        Default ``nn.Sigmoid``.
     eps : float
         Numerical epsilon shared with submodules.
     init_mode : str
@@ -48,13 +51,16 @@ class SASS(nn.Module):
     def __init__(
         self,
         d_prime: int,
+        gen_gate_activation: type[nn.Module] | None = None,
         eps: float = 1e-8,
         init_mode: Literal["gaussian"] = "gaussian",
     ) -> None:
         super().__init__()
         self.spn = PhaseAwareSPN(d_prime, eps=eps, init_mode=init_mode)
         self.kernel = SpectralKernel(d_prime, init_mode=init_mode)
-        self.sagu = DOSTDomainSAGU(d_prime, eps=eps)
+        self.sagu = DOSTDomainSAGU(
+            d_prime, gen_gate_activation=gen_gate_activation, eps=eps
+        )
 
         self.capture_gate: bool = False
         self.last_gate: Tensor | None = None

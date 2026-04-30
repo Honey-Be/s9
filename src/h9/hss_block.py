@@ -38,7 +38,11 @@ class HSSBlock(nn.Module):
     spatial_dims : int
         Spatial dimensionality. Default 2.
     gen_activation : type[nn.Module] | None
-        Factory for the FFN activation. Default ``StableModReLU``.
+        Factory for the FFN activation (complex → complex).
+        Default ``StableModReLU``.
+    gen_gate_activation : type[nn.Module] | None
+        Factory for the SAGU magnitude-gate activation (real → real).
+        Default ``nn.Sigmoid``.
     d_ff_mult : int
         FFN hidden dim multiplier. Default 4.
     init_mode : Literal["gaussian"]
@@ -57,6 +61,7 @@ class HSSBlock(nn.Module):
         n_per_axis: int,
         spatial_dims: int = 2,
         gen_activation: type[nn.Module] | None = None,
+        gen_gate_activation: type[nn.Module] | None = None,
         d_ff_mult: int = 4,
         init_mode: Literal["gaussian"] = "gaussian",
         dropout: float = 0.0,
@@ -84,7 +89,12 @@ class HSSBlock(nn.Module):
         self.b_v_im = nn.Parameter(torch.empty(self.d_prime))
 
         # SASS core
-        self.sass = SASS(self.d_prime, eps=eps, init_mode=init_mode)
+        self.sass = SASS(
+            self.d_prime,
+            gen_gate_activation=gen_gate_activation,
+            eps=eps,
+            init_mode=init_mode,
+        )
 
         # Output gating + projection: W_y, W_o complex (d_prime, d_prime)
         self.W_y_re = nn.Parameter(torch.empty(self.d_prime, self.d_prime))

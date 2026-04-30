@@ -67,7 +67,11 @@ class H9ClassifierModelExample(nn.Module):
         If True (default), apply a 1x1 Conv2D mapping ``in_channels -> d_model``
         before DOST. If False and ``in_channels == d_model``, skip stem.
     gen_activation : type[nn.Module] | None
-        Factory for FFN activations. Default StableModReLU.
+        Factory for FFN activations (complex → complex).
+        Default StableModReLU.
+    gen_gate_activation : type[nn.Module] | None
+        Factory for the SAGU magnitude-gate activation (real → real).
+        Default ``nn.Sigmoid``.
     d_ff_mult : int
         FFN expansion multiplier. Default 4.
     init_mode : Literal["gaussian"]
@@ -119,6 +123,7 @@ class H9ClassifierModelExample(nn.Module):
         spatial_dims: int = 2,
         use_stem: bool = True,
         gen_activation: type[nn.Module] | None = None,
+        gen_gate_activation: type[nn.Module] | None = None,
         d_ff_mult: int = 4,
         init_mode: Literal["gaussian"] = "gaussian",
         dropout: float = 0.0,
@@ -156,6 +161,7 @@ class H9ClassifierModelExample(nn.Module):
                     n_per_axis=n_per_axis,
                     spatial_dims=spatial_dims,
                     gen_activation=gen_activation,
+                    gen_gate_activation=gen_gate_activation,
                     d_ff_mult=d_ff_mult,
                     init_mode=init_mode,
                     dropout=dropout,
