@@ -14,8 +14,9 @@ except Exception:  # pragma: no cover
 from collections.abc import Sequence
 
 from s9._common.kernel_base import InitMode, Discretization
-from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype, get_float_dtype
-from s9.modules import ComplexDropout
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch.blocks.regularizations.complex import ComplexDropout
+from ypsilon_torch.blocks.activations import ComplexActivationFunctionBase
 from s9.multihead_s9_modules import (
     MultiheadS9Head,
     _normalize_head_channels,

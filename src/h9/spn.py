@@ -23,6 +23,8 @@ from typing import Literal
 import torch
 from torch import Tensor, nn
 
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
+
 
 class PhaseAwareSPN(nn.Module):
     """Phase-aware SpectralPulseNet gate generator.
@@ -47,16 +49,18 @@ class PhaseAwareSPN(nn.Module):
         d_prime: int,
         eps: float = 1e-8,
         init_mode: Literal["gaussian"] = "gaussian",
+        dtype_idx: FPDTypeIdx = 64
     ) -> None:
         super().__init__()
         self.d_prime = d_prime
         self.eps = eps
         self.init_mode = init_mode
+        dtype = get_float_dtype(dtype_idx)
 
-        self.W_m = nn.Parameter(torch.empty(d_prime, d_prime))
-        self.W_p = nn.Parameter(torch.empty(d_prime, d_prime))
-        self.W_p_prime = nn.Parameter(torch.empty(d_prime, d_prime))
-        self.b_g = nn.Parameter(torch.empty(d_prime))
+        self.W_m = nn.Parameter(torch.empty(d_prime, d_prime, dtype=dtype))
+        self.W_p = nn.Parameter(torch.empty(d_prime, d_prime, dtype=dtype))
+        self.W_p_prime = nn.Parameter(torch.empty(d_prime, d_prime, dtype=dtype))
+        self.b_g = nn.Parameter(torch.empty(d_prime, dtype=dtype))
 
         self.reset_parameters()
 

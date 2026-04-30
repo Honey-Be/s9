@@ -2,14 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from s9.examples import BiaffineS9ClassifierModelExample
-from s9.transforms.dost import DOST, IDOST
+from ypsilon_torch.blocks.transforms.real_complex.dost import DOST, IDOST
 import pytest
 
 from typing import Literal
 
-from s9.base import get_float_dtype, get_complex_dtype, FPDTypeIdx
-
-from s9.transforms.sst import SynchronizedGenericSST, InverseSynchronizedGenericSST
+from ypsilon_torch import get_float_dtype, get_complex_dtype, FPDTypeIdx
 
 
 from . import SPATIAL_SHAPES

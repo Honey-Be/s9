@@ -18,7 +18,7 @@ import torch.nn as nn
 from s9._common.kernel_base import SSMKernelBase, InitMode, Discretization
 from s9._common.outer_product import build_outer_product_global_kernel
 from s9._common.fft_conv import fftn_convolve_nd, rfftn_convolve_nd
-from s9.base import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 
 
 class SSMLayerBase(nn.Module, ABC):

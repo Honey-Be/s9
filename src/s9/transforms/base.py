@@ -13,9 +13,4 @@ try:
 except ImportError:
     from typing_extensions import override
 
-from s9.base import NonLearnableProcessorBase, FPDTypeIdx, COMPLEX_DTYPES_DICT, FLOAT_DTYPES_DICT
-
-class InvertibleTransformsBase[I: InvertibleTransformsBase[Self]](NonLearnableProcessorBase, ABC):
-    @abstractmethod
-    def get_inverse_transform(self) -> I:
-        raise NotImplementedError()
+from ypsilon_torch.blocks.transforms import InvertibleTransformsBase

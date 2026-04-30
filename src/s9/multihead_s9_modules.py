@@ -11,7 +11,8 @@ try:
 except Exception:  # pragma: no cover
     from typing_extensions import override  # type: ignore
 
-from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype
+from ypsilon_torch import get_complex_dtype, get_float_dtype, FPDTypeIdx
+from ypsilon_torch.blocks.activations import ComplexActivationFunctionBase
 from s9.modules import S9SSMKernel, ComplexDropout
 from s9._common.kernel_base import InitMode, Discretization
 

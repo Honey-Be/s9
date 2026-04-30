@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover
 from collections.abc import Sequence
 
 from s9._common.kernel_base import InitMode, Discretization
-from s9.base import FPDTypeIdx, get_float_dtype
+from ypsilon_torch import FPDTypeIdx, get_float_dtype
 from s9.multihead_rs9_modules import (
     MultiheadRS9Head,
     _normalize_head_channels,

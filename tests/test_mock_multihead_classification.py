@@ -2,12 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from s9.examples import MultiheadS9ClassifierModelExample
-from s9.transforms.dost import DOST, IDOST
+from ypsilon_torch.blocks.transforms.real_complex.dost import DOST, IDOST
 import pytest
 
 from typing import Literal
 
-from s9.base import FLOAT_DTYPES_DICT, FPDTypeIdx
+from ypsilon_torch import FLOAT_DTYPES_DICT, FPDTypeIdx
 
 from . import SPATIAL_SHAPES
 

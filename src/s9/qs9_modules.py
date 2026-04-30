@@ -7,7 +7,8 @@ from typing import Callable, Optional
 import torch
 import torch.nn as nn
 
-from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, get_complex_dtype
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype
+from ypsilon_torch.blocks.activations import ComplexActivationFunctionBase
 from s9.modules import S9Layer
 from s9._common.kernel_base import InitMode, Discretization
 from s9._common.outer_product import build_outer_product_global_kernel

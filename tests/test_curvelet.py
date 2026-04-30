@@ -2,12 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from s9.examples import BiaffineS9ClassifierModelExample
-from s9.transforms.curvelet import FastCurveletTransform2D, InverseFastCurveletTransform2D
+from ypsilon_torch.blocks.transforms.real_complex.curvelet import FastCurveletTransform2D, InverseFastCurveletTransform2D
 import pytest
 
 from typing import Literal
 
-from s9.base import get_float_dtype, get_complex_dtype, FPDTypeIdx
+from ypsilon_torch import get_float_dtype, get_complex_dtype, FPDTypeIdx
 
 from . import SPATIAL_SHAPES
 

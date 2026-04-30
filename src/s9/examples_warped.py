@@ -28,10 +28,10 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 
-from s9.activations.complex.stable_modrelu import StableModReLU
-from s9.base import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch.blocks.activations.complex import StableModReLU
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 from s9.modules import S9Layer
-from s9.transforms.warped_dost import WarpedDOST, WarpedDOSTFitter
+from ypsilon_torch.blocks.transforms.real_complex.warped_dost import WarpedDOST, WarpedDOSTFitter
 
 
 # ---------------------------------------------------------------------------

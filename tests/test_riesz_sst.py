@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from s9.examples import BiaffineS9ClassifierModelExample
-from s9.transforms.riesz import RieszTransform, InverseRieszTransform
+from ypsilon_torch.blocks.transforms.real_complex.riesz import RieszTransform, InverseRieszTransform
 import pytest
 
 from typing import Literal
 
-from s9.base import get_float_dtype, get_complex_dtype, FPDTypeIdx
+from ypsilon_torch import get_float_dtype, get_complex_dtype, FPDTypeIdx
 
 
-from s9.transforms.sst import SynchronizedGenericSST, InverseSynchronizedGenericSST
+from ypsilon_torch.blocks.transforms.real_complex.sst import SynchronizedGenericSST, InverseSynchronizedGenericSST
 
 
 from . import SPATIAL_SHAPES

@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 
-from s9.base import FPDTypeIdx, get_complex_dtype, get_float_dtype
-from s9.transforms.dost import DOST
-from s9.activations.complex.stable_modrelu import StableModReLU
-from s9.activations.real.thash import ThASh
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch.blocks.transforms.real_complex.dost import DOST
+from ypsilon_torch.blocks.activations.complex import StableModReLU
+from ypsilon_torch.blocks.activations.real import ThASh
 
 from s9.contrib.gated_delta_s9_modules import GatedDeltaS9Layer, BiaffineGatedDeltaS9Layer
 from s9.contrib.gated_delta_rs9_modules import GatedDeltaRS9Layer, BiaffineGatedDeltaRS9Layer

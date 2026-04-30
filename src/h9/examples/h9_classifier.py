@@ -15,7 +15,8 @@ import torch
 from torch import Tensor, nn
 
 from h9.hss_block import HSSBlock
-from s9.transforms.warped_dost import WarpedDOST
+from ypsilon_torch.blocks.transforms.real_complex.warped_dost import WarpedDOST, InverseWarpedDOST
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 
 
 class _H9ClassifierFitter:
@@ -128,7 +129,7 @@ class H9ClassifierModelExample(nn.Module):
         init_mode: Literal["gaussian"] = "gaussian",
         dropout: float = 0.0,
         eps: float = 1e-8,
-        dtype_idx: Literal[32, 64] = 64,
+        dtype_idx: FPDTypeIdx = 64,
     ) -> None:
         super().__init__()
         self.in_channels = in_channels
@@ -138,13 +139,16 @@ class H9ClassifierModelExample(nn.Module):
         self.d_prime = d_model * (n_per_axis ** spatial_dims)
         self.num_classes = num_classes
 
+        self.r_dtype: torch.dtype = get_float_dtype(dtype_idx)
+
         # Stem: 1x1 Conv2D, channel mapping only, no spatial change.
-        if use_stem or in_channels != d_model:
+        if use_stem or (in_channels != d_model):
             self.stem: nn.Module = nn.Conv2d(
-                in_channels, d_model, kernel_size=1, stride=1, padding=0
+                in_channels, d_model, kernel_size=1, stride=1, padding=0,
+                dtype=self.r_dtype
             )
         else:
-            self.stem = nn.Identity()
+            self.stem: nn.Module = nn.Identity()
 
         # Warped DOST (non-learnable; calibrate before use)
         # TODO(h9): Verify the WarpedDOST constructor signature against the
@@ -154,7 +158,7 @@ class H9ClassifierModelExample(nn.Module):
         self.dost = WarpedDOST(D=spatial_dims, n_per_axis=n_per_axis)
 
         # HSS blocks
-        self.hss_blocks = nn.ModuleList(
+        self.hss_blocks: nn.ModuleList = nn.ModuleList(
             [
                 HSSBlock(
                     d_model=d_model,
@@ -173,7 +177,7 @@ class H9ClassifierModelExample(nn.Module):
         )
 
         # Classifier head: GAP + Linear (operates on real, post-IDOST features)
-        self.head = nn.Linear(d_model, num_classes)
+        self.head: nn.Linear = nn.Linear(d_model, num_classes, dtype=self.r_dtype)
 
         # Attribution flag (default off for zero training overhead)
         self.attribution_enabled: bool = False
@@ -188,7 +192,7 @@ class H9ClassifierModelExample(nn.Module):
             DOST boundaries via equal-power quantile.
         """
         with torch.no_grad():
-            u = self.stem(x)
+            u: Tensor = self.stem(x)
             self.dost.fit(u)
 
     @property
@@ -216,14 +220,14 @@ class H9ClassifierModelExample(nn.Module):
         RuntimeError
             If DOST has not been calibrated for the input's spatial shape.
         """
-        u = self.stem(x)                              # (B, D, H, W) real
-        z = self.dost(u)                              # (B, D', H, W) complex
+        u: Tensor = self.stem(x)                              # (B, D, H, W) real
+        z: Tensor = self.dost(u)                              # (B, D', H, W) complex
         for block in self.hss_blocks:
             z = block(z)                              # shape preserved
         # Inverse DOST
-        inv = self.dost.get_inverse_transform()
-        y = inv(z)                                    # (B, D, H, W) real
+        inv: InverseWarpedDOST = self.dost.get_inverse_transform()
+        y: Tensor = inv(z)                                    # (B, D, H, W) real
         # Head: GAP + Linear
-        pooled = y.mean(dim=(-2, -1))                 # (B, D)
-        logits = self.head(pooled)                    # (B, num_classes)
+        pooled: Tensor = y.mean(dim=(-2, -1), dtype=self.r_dtype)                 # (B, D)
+        logits: Tensor = self.head(pooled)                    # (B, num_classes)
         return logits

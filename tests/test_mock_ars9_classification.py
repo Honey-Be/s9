@@ -1,7 +1,7 @@
 import torch
 import pytest
 
-from s9.base import FLOAT_DTYPES_DICT, FPDTypeIdx
+from ypsilon_torch import FLOAT_DTYPES_DICT, FPDTypeIdx
 from s9.examples import ARS9ClassifierModelExample
 
 from . import SPATIAL_SHAPES

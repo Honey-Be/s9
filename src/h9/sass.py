@@ -20,6 +20,7 @@ from torch import Tensor, nn
 from h9.sagu import DOSTDomainSAGU
 from h9.spectral_kernel import SpectralKernel
 from h9.spn import PhaseAwareSPN
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 
 
 class SASS(nn.Module):
@@ -51,12 +52,13 @@ class SASS(nn.Module):
     def __init__(
         self,
         d_prime: int,
-        gen_gate_activation: type[nn.Module] | None = None,
+        gen_gate_activation: Callable[[], nn.Module] = nn.Sigmoid,
         eps: float = 1e-8,
         init_mode: Literal["gaussian"] = "gaussian",
+        dtype_idx: FPDTypeIdx = 64
     ) -> None:
         super().__init__()
-        self.spn = PhaseAwareSPN(d_prime, eps=eps, init_mode=init_mode)
+        self.spn = PhaseAwareSPN(d_prime, eps=eps, init_mode=init_mode, dtype_idx=dtype_idx)
         self.kernel = SpectralKernel(d_prime, init_mode=init_mode)
         self.sagu = DOSTDomainSAGU(
             d_prime, gen_gate_activation=gen_gate_activation, eps=eps

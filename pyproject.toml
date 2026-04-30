@@ -1,6 +1,6 @@
 [project]
 name = "s9"
-version = "0.5.2"
+version = "0.6.0"
 description = "S9/RS9: Multidimensional SSM based on S4ND + S7 Fusion"
 authors = [
     {name = "윤병익",email = "yeun0908@gmail.com"}
@@ -44,12 +44,18 @@ torch = [
     {version = "2.10.0+cu130", source = "pytorch-cu130", markers = "extra!='cpu' and extra!='cu126' and extra!='cu128' and extra=='cu130'"}
 ]
 numpy = "^2.4.3"
+ypsilon-torch = [
+    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.0.0", extras = ["cpu"], markers = "extra=='cpu' and extra!='cu126' and extra!='cu128' and extra!='cu130'"},
+    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.0.0", extras = ["cu126"], markers = "extra!='cpu' and extra=='cu126' and extra!='cu128' and extra!='cu130'"},
+    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.0.0", extras = ["cu128"], markers = "extra!='cpu' and extra!='cu126' and extra=='cu128' and extra!='cu130'"},
+    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.0.0", extras = ["cu130"], markers = "extra!='cpu' and extra!='cu126' and extra!='cu128' and extra=='cu130'"}
+]
 
 [tool.poetry.extras]
-cpu = ["torch"]
-cu126 = ["torch"]
-cu128 = ["torch"]
-cu130 = ["torch"]
+cpu = ["torch", "ypsilon-torch"]
+cu126 = ["torch", "ypsilon-torch"]
+cu128 = ["torch", "ypsilon-torch"]
+cu130 = ["torch", "ypsilon-torch"]
 h9 = ["h9"]
 
 [build-system]

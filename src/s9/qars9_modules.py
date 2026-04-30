@@ -7,7 +7,7 @@ from typing import Callable
 import torch
 import torch.nn as nn
 
-from s9.base import FPDTypeIdx, get_float_dtype
+from ypsilon_torch import FPDTypeIdx, get_float_dtype
 from s9.ars9_modules import ARS9Layer
 from s9._common.kernel_base import InitMode, Discretization
 from s9._common.outer_product import build_outer_product_global_kernel

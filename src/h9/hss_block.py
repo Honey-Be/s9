@@ -24,6 +24,8 @@ from torch import Tensor, nn
 from h9.components import ComplexFFN, ComplexLayerNorm
 from h9.sass import SASS
 
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch.blocks.activations.complex import StableModReLU
 
 class HSSBlock(nn.Module):
     """One HSS block (residual SASS + residual FFN).
@@ -51,7 +53,7 @@ class HSSBlock(nn.Module):
         FFN dropout. Default ``0.0``.
     eps : float
         Numerical epsilon. Default ``1e-8``.
-    dtype_idx : Literal[32, 64]
+    dtype_idx : Literal[32, 64, 128]
         Precision selector. Default 64.
     """
 
@@ -60,13 +62,13 @@ class HSSBlock(nn.Module):
         d_model: int,
         n_per_axis: int,
         spatial_dims: int = 2,
-        gen_activation: type[nn.Module] | None = None,
-        gen_gate_activation: type[nn.Module] | None = None,
+        gen_activation: Callable[[int, float, FPDTypeIdx], ComplexActivationFunctionBase] = StableModReLU,
+        gen_gate_activation: Callable[[], nn.Module] = nn.Sigmoid,
         d_ff_mult: int = 4,
         init_mode: Literal["gaussian"] = "gaussian",
         dropout: float = 0.0,
         eps: float = 1e-8,
-        dtype_idx: Literal[32, 64] = 64,
+        dtype_idx: FPDTypeIdx = 64,
     ) -> None:
         super().__init__()
         self.d_model = d_model
@@ -75,18 +77,14 @@ class HSSBlock(nn.Module):
         self.d_prime = d_model * (n_per_axis ** spatial_dims)
 
         # Pre-norm layers
-        self.norm_1 = ComplexLayerNorm(self.d_prime, eps=1e-5)
-        self.norm_2 = ComplexLayerNorm(self.d_prime, eps=1e-5)
+        self.norm_1 = ComplexLayerNorm(self.d_prime, eps=1e-5, dtype_idx=dtype_idx)
+        self.norm_2 = ComplexLayerNorm(self.d_prime, eps=1e-5, dtype_idx=dtype_idx)
 
         # Dual projection: W_u, W_v complex (d_prime, d_prime)
-        self.W_u_re = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.W_u_im = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.b_u_re = nn.Parameter(torch.empty(self.d_prime))
-        self.b_u_im = nn.Parameter(torch.empty(self.d_prime))
-        self.W_v_re = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.W_v_im = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.b_v_re = nn.Parameter(torch.empty(self.d_prime))
-        self.b_v_im = nn.Parameter(torch.empty(self.d_prime))
+        self.W_u = nn.Parameter(torch.empty(self.d_prime, self.d_prime, dtype=get_complex_dtype(dtype_idx)))
+        self.b_u = nn.Parameter(torch.empty(self.d_prime, dtype=get_complex_dtype(dtype_idx)))
+        self.W_v = nn.Parameter(torch.empty(self.d_prime, self.d_prime, dtype=get_complex_dtype(dtype_idx)))
+        self.b_v = nn.Parameter(torch.empty(self.d_prime, dtype=get_complex_dtype(dtype_idx)))
 
         # SASS core
         self.sass = SASS(
@@ -94,15 +92,13 @@ class HSSBlock(nn.Module):
             gen_gate_activation=gen_gate_activation,
             eps=eps,
             init_mode=init_mode,
+            dtype_idx=dtype_idx
         )
 
         # Output gating + projection: W_y, W_o complex (d_prime, d_prime)
-        self.W_y_re = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.W_y_im = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.b_y_re = nn.Parameter(torch.empty(self.d_prime))
-        self.b_y_im = nn.Parameter(torch.empty(self.d_prime))
-        self.W_o_re = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
-        self.W_o_im = nn.Parameter(torch.empty(self.d_prime, self.d_prime))
+        self.W_y = nn.Parameter(torch.empty(self.d_prime, self.d_prime, dtype=get_complex_dtype(dtype_idx)))
+        self.b_y = nn.Parameter(torch.empty(self.d_prime, dtype=get_complex_dtype(dtype_idx)))
+        self.W_o = nn.Parameter(torch.empty(self.d_prime, self.d_prime, dtype=get_complex_dtype(dtype_idx)))
 
         # FFN
         self.ffn = ComplexFFN(
@@ -110,6 +106,7 @@ class HSSBlock(nn.Module):
             d_ff=d_ff_mult * self.d_prime,
             gen_activation=gen_activation,
             dropout=dropout,
+            dtype_idx=dtype_idx
         )
 
         self.reset_parameters()
@@ -118,13 +115,12 @@ class HSSBlock(nn.Module):
         """Xavier-like init for dual projection and output gate/proj; zero biases."""
         std = 1.0 / math.sqrt(self.d_prime)
         for p in [
-            self.W_u_re, self.W_u_im, self.W_v_re, self.W_v_im,
-            self.W_y_re, self.W_y_im, self.W_o_re, self.W_o_im,
+            self.W_u, self.W_v, self.W_y, self.W_o
         ]:
-            nn.init.normal_(p, mean=0.0, std=std)
+            nn.init.normal_(p.real, mean=0.0, std=std)
+            nn.init.normal_(p.imag, mean=0.0, std=std)
         for p in [
-            self.b_u_re, self.b_u_im, self.b_v_re, self.b_v_im,
-            self.b_y_re, self.b_y_im,
+            self.b_u, self.b_v, self.b_y
         ]:
             nn.init.zeros_(p)
 
@@ -143,20 +139,13 @@ class HSSBlock(nn.Module):
         """
         # Residual 1: SASS branch
         Z_pre = self.norm_1(Z)
-        W_u = torch.complex(self.W_u_re, self.W_u_im)
-        b_u = torch.complex(self.b_u_re, self.b_u_im)
-        W_v = torch.complex(self.W_v_re, self.W_v_im)
-        b_v = torch.complex(self.b_v_re, self.b_v_im)
-        U = torch.einsum("bchw,cd->bdhw", Z_pre, W_u) + b_u.view(1, -1, 1, 1)
-        V = torch.einsum("bchw,cd->bdhw", Z_pre, W_v) + b_v.view(1, -1, 1, 1)
+        U = torch.einsum("bchw,cd->bdhw", Z_pre, self.W_u) + self.b_u.view(1, -1, 1, 1)
+        V = torch.einsum("bchw,cd->bdhw", Z_pre, self.W_v) + self.b_v.view(1, -1, 1, 1)
 
         sass_out = self.sass(U)
 
-        W_y = torch.complex(self.W_y_re, self.W_y_im)
-        b_y = torch.complex(self.b_y_re, self.b_y_im)
-        W_o = torch.complex(self.W_o_re, self.W_o_im)
-        O = (torch.einsum("bchw,cd->bdhw", sass_out, W_y) + b_y.view(1, -1, 1, 1)) * V
-        Z_out = torch.einsum("bchw,cd->bdhw", O, W_o)
+        O = (torch.einsum("bchw,cd->bdhw", sass_out, self.W_y) + self.b_y.view(1, -1, 1, 1)) * V
+        Z_out = torch.einsum("bchw,cd->bdhw", O, self.W_o)
         Z = Z + Z_out
 
         # Residual 2: FFN branch

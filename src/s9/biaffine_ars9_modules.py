@@ -10,7 +10,7 @@ try:
 except Exception:  # pragma: no cover
     from typing_extensions import override  # type: ignore
 
-from s9.base import FPDTypeIdx, get_float_dtype
+from ypsilon_torch import FPDTypeIdx, get_float_dtype
 from s9.multihead_ars9_modules import HeadMapperBase, MultiheadARS9HeadBase, MultiheadARS9LayerBase
 from s9._common.kernel_base import InitMode, Discretization
 from s9.biaffine_rs9_modules import RealBiaffineChannelMixer

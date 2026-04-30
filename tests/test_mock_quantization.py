@@ -3,14 +3,14 @@
 import torch
 import pytest
 
-from s9.base import FLOAT_DTYPES_DICT, FPDTypeIdx
+from ypsilon_torch import FLOAT_DTYPES_DICT, FPDTypeIdx
 from s9.quantization import QuantConfig, fake_quant, symmetric_per_tensor_quantize, assert_discrete_stability
 from s9.quantization.kernel_cache import QuantizedKernelCache
 from s9.qs9_modules import QS9Layer
 from s9.qrs9_modules import QRS9Layer
 from s9.qars9_modules import QARS9Layer
-from s9.activations.complex.stable_modrelu import StableModReLU
-from s9.activations.real.thash import ThASh
+from ypsilon_torch.blocks.activations.complex import StableModReLU
+from ypsilon_torch.blocks.activations.real import ThASh
 
 from . import SPATIAL_SHAPES
 

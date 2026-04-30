@@ -10,23 +10,13 @@ try:
 except Exception:  # pragma: no cover
     from typing_extensions import override
 
-from s9.base import ComplexActivationFunctionBase, get_complex_dtype, get_float_dtype, FPDTypeIdx
-from s9.activations.complex.stable_cardioid import StableComplexCardioid
-from s9.activations.complex.stable_modrelu import StableModReLU
-from s9.utils import complex_dropout
+from ypsilon_torch import get_complex_dtype, get_float_dtype, FPDTypeIdx
 from s9._common.kernel_base import DiagonalSSMKernelBase, InitMode, Discretization
 from s9._common.outer_product import build_outer_product_global_kernel
 from s9._common.fft_conv import fftn_convolve_nd
 
-class ComplexDropout(nn.Module):
-    def __init__(self, p: float = 0.5):
-        super().__init__()
-        if not (0.0 <= p <= 1.0):
-            raise ValueError(f"dropout probability must be in [0, 1], got {p}")
-        self.p: float = p
-
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        return complex_dropout(z,self.p,self.training)
+from ypsilon_torch.blocks.activations.complex import StableComplexCardioid, StableModReLU
+from ypsilon_torch.blocks.regularizations.complex import ComplexDropout
 
 class S9SSMKernel(DiagonalSSMKernelBase):
     """

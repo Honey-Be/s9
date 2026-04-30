@@ -2,15 +2,16 @@ import torch
 import torch.nn as nn
 from typing import Tuple
 
-from s9.base import FPDTypeIdx, get_complex_dtype, get_float_dtype
-from s9.transforms.dost import DOST
-from s9.modules import S9Layer, StableModReLU
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
+from ypsilon_torch.blocks.transforms.real_complex.dost import DOST
+from s9.modules import S9Layer
+from ypsilon_torch.blocks.activations.complex import StableModReLU
 from s9.multihead_s9_modules import MultiheadS9Layer
 from s9.biaffine_s9_modules import BiaffineS9Layer
 from s9.ars9_modules import ARS9Layer
 from s9.multihead_ars9_modules import MultiheadARS9Layer
 from s9.biaffine_ars9_modules import BiaffineARS9Layer
-from s9.activations.real.thash import ThASh
+from ypsilon_torch.blocks.activations.real import ThASh
 
 class S9ClassifierModelExample(nn.Module):
     """

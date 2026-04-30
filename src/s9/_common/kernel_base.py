@@ -18,7 +18,7 @@ from typing import Literal, Optional
 import torch
 import torch.nn as nn
 
-from s9.base import FPDTypeIdx, get_float_dtype
+from ypsilon_torch import FPDTypeIdx, get_float_dtype
 
 InitMode = Literal["legacy", "hippo_n", "s4d_real"]
 Discretization = Literal["zoh", "approx"]

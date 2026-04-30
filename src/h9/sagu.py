@@ -18,7 +18,8 @@ import math
 
 import torch
 from torch import Tensor, nn
-
+from typing import Callable
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 
 class DOSTDomainSAGU(nn.Module):
     """SAGU adapted for DOST coefficient domain.
@@ -47,31 +48,32 @@ class DOSTDomainSAGU(nn.Module):
     def __init__(
         self,
         d_prime: int,
-        gen_gate_activation: type[nn.Module] | None = None,
+        gen_gate_activation: Callable[[], nn.Module] = nn.Sigmoid,
         eps: float = 1e-8,
+        dtype_idx: FPDTypeIdx = 64
     ) -> None:
         super().__init__()
         self.d_prime = d_prime
         self.eps = eps
 
-        if gen_gate_activation is None:
-            gen_gate_activation = nn.Sigmoid
         self.gate_activation = gen_gate_activation()
 
+        c_dtype = get_complex_dtype(dtype_idx)
+        r_dtype = get_float_dtype(dtype_idx)
+
         # Complex linear branch (separate real/imag)
-        self.W_1_re = nn.Parameter(torch.empty(d_prime, d_prime))
-        self.W_1_im = nn.Parameter(torch.empty(d_prime, d_prime))
+        self.W_1 = nn.Parameter(torch.empty(d_prime, d_prime, dtype=c_dtype))
         # Real magnitude gate
-        self.W_2 = nn.Parameter(torch.empty(d_prime, d_prime))
-        self.b_2 = nn.Parameter(torch.empty(d_prime))
+        self.W_2 = nn.Parameter(torch.empty(d_prime, d_prime, dtype=r_dtype))
+        self.b_2 = nn.Parameter(torch.empty(d_prime, dtype=r_dtype))
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         """Xavier-like init."""
         std = 1.0 / math.sqrt(self.d_prime)
-        nn.init.normal_(self.W_1_re, mean=0.0, std=std)
-        nn.init.normal_(self.W_1_im, mean=0.0, std=std)
+        nn.init.normal_(self.W_1.real, mean=0.0, std=std)
+        nn.init.normal_(self.W_1.imag, mean=0.0, std=std)
         nn.init.normal_(self.W_2, mean=0.0, std=std)
         nn.init.zeros_(self.b_2)
 
@@ -89,7 +91,7 @@ class DOSTDomainSAGU(nn.Module):
             Same shape, complex.
         """
         # Complex linear branch
-        W_1 = torch.complex(self.W_1_re, self.W_1_im)
+        W_1 = self.W_1
         linear_out = torch.einsum("bchw,cd->bdhw", U_tilde, W_1)
 
         # Magnitude gate (real)

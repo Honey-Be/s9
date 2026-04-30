@@ -12,7 +12,7 @@ from typing import Literal
 
 import torch
 from torch import Tensor, nn
-
+from ypsilon_torch import FPDTypeIdx, get_complex_dtype, get_float_dtype
 
 class SpectralKernel(nn.Module):
     """Per-band learnable complex kernel.
@@ -40,6 +40,7 @@ class SpectralKernel(nn.Module):
         init_mode: Literal["gaussian"] = "gaussian",
         init_sigma: float = 1.0,
         learnable_sigma: bool = True,
+        dtype_idx: FPDTypeIdx = 64
     ) -> None:
         super().__init__()
         self.d_prime = d_prime
@@ -47,17 +48,19 @@ class SpectralKernel(nn.Module):
         self.init_sigma = init_sigma
         self.learnable_sigma = learnable_sigma
 
-        self.psi_re = nn.Parameter(torch.empty(d_prime))
-        self.psi_im = nn.Parameter(torch.empty(d_prime))
+        c_dtype = get_complex_dtype(dtype_idx)
+        r_dtype = get_float_dtype(dtype_idx)
+
+        self.psi = nn.Parameter(torch.empty(d_prime, dtype=c_dtype))
         if learnable_sigma:
-            self.sigma = nn.Parameter(torch.empty(()))
+            self.sigma = nn.Parameter(torch.empty((), dtype=r_dtype))
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         """Initialize psi_re, psi_im (and sigma if learnable)."""
-        nn.init.normal_(self.psi_re, mean=0.0, std=self.init_sigma)
-        nn.init.normal_(self.psi_im, mean=0.0, std=self.init_sigma)
+        nn.init.normal_(self.psi.real, mean=0.0, std=self.init_sigma)
+        nn.init.normal_(self.psi.imag, mean=0.0, std=self.init_sigma)
         if self.learnable_sigma:
             nn.init.ones_(self.sigma)
 
@@ -69,7 +72,7 @@ class SpectralKernel(nn.Module):
         Tensor
             Complex tensor of shape ``(d_prime,)``.
         """
-        K = torch.complex(self.psi_re, self.psi_im)
+        K = self.psi
         if self.learnable_sigma:
             K = self.sigma * K
         return K

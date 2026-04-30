@@ -12,7 +12,7 @@ try:
 except Exception:  # pragma: no cover
     from typing_extensions import override, Callable  # type: ignore
 
-from s9.base import get_float_dtype, FPDTypeIdx
+from ypsilon_torch import get_float_dtype, FPDTypeIdx
 from s9._common.kernel_base import DiagonalSSMKernelBase, InitMode, Discretization
 from s9._common.outer_product import build_outer_product_global_kernel
 from s9._common.fft_conv import rfftn_convolve_nd

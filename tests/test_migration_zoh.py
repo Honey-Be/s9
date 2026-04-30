@@ -6,8 +6,8 @@ import pytest
 from s9.modules import S9SSMKernel, S9Layer
 from s9.rs9_modules import RS9SSMKernel, RS9Layer
 from s9.ars9_modules import ARS9SSMKernel, ARS9Layer
-from s9.activations.real.thash import ThASh
-from s9.activations.complex.stable_modrelu import StableModReLU
+from ypsilon_torch.blocks.activations.real import ThASh
+from ypsilon_torch.blocks.activations.complex import StableModReLU
 from s9.migration.zoh import migrate_state_dict_zoh, migrate_state_dict_from_zoh
 
 
