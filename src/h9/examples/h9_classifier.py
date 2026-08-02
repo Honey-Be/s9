@@ -120,7 +120,7 @@ class H9ClassifierModelExample(nn.Module):
         d_model: int,
         n_layers: int,
         num_classes: int,
-        n_per_axis: int = 2,
+        n_per_axis: int = 6,
         spatial_dims: int = 2,
         use_stem: bool = True,
         gen_activation: type[nn.Module] | None = None,
@@ -150,11 +150,21 @@ class H9ClassifierModelExample(nn.Module):
         else:
             self.stem: nn.Module = nn.Identity()
 
-        # Warped DOST (non-learnable; calibrate before use)
-        # TODO(h9): Verify the WarpedDOST constructor signature against the
-        # current s9.transforms.warped_dost. The README example uses:
-        #   WarpedDOST(D=2, n_per_axis=6)
-        # where D=spatial_dims and n_per_axis=n. Adjust if the API has changed.
+        # Warped DOST (non-learnable; calibrate before use).
+        #
+        # n_per_axis >= 3 is a hard requirement of WarpedDOST (DC bin + at
+        # least one log bin + wrap-around bin). The old default here was 2,
+        # which constructed fine and then raised ValueError at calibrate()
+        # time -- see README-WARPED-DOST.md "제약 조건". Fail at construction
+        # instead, where the message can point at the actual cause.
+        if n_per_axis < 3:
+            raise ValueError(
+                f"n_per_axis must be >= 3 (DC + at least one log bin + wrap), "
+                f"got {n_per_axis}. WarpedDOST additionally requires "
+                f"n_per_axis <= N // 2 + 2 for every spatial axis length N, so "
+                f"choose it from the SMALLEST resolution the model must handle; "
+                f"6-8 is the usual range."
+            )
         self.dost = WarpedDOST(D=spatial_dims, n_per_axis=n_per_axis)
 
         # HSS blocks

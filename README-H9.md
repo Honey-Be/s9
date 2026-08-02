@@ -38,6 +38,22 @@ git checkout h9
 pip install -e ".[cu130,h9]"   # or [cpu], [cu128], [cu126]
 ```
 
+### `n_per_axis` 고르기
+
+`n_per_axis`(= K)는 자유 파라미터가 아니다. `WarpedDOST`가 세 제약을 강제한다:
+
+| 제약 | 이유 |
+|---|---|
+| `K >= 3` | DC bin + 최소 1개 log bin + wrap-around bin |
+| `N >= 4` (모든 공간 축) | 비자명한 band layout의 하한 |
+| `K <= N // 2 + 2` | band 수가 축 길이에 의해 상한을 받음 |
+
+세 번째 때문에 **K는 모델이 다룰 가장 작은 해상도를 기준으로 정해야 한다** —
+예컨대 최소 N=16이면 K ≤ 10. 통상 6~8을 쓴다 (`README-WARPED-DOST.md` 참조).
+
+채널 팽창이 `D' = d_model · K^spatial_dims`이므로 K는 비용에 지수로 들어간다:
+2D에서 K=6이면 36배, 3D(비디오)에서는 216배다. 위반 시 `ValueError`.
+
 ### Minimal usage
 
 ```python
@@ -49,7 +65,7 @@ model = H9ClassifierModelExample(
     d_model=64,
     n_layers=8,
     num_classes=10,
-    n_per_axis=2,        # DOST band count (D' = d_model * n_per_axis^2)
+    n_per_axis=6,        # DOST band count (D' = d_model * n_per_axis^2)
     spatial_dims=2,
 )
 

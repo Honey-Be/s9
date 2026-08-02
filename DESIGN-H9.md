@@ -29,7 +29,7 @@ Three departures from S9 standard layers:
 | $C_{\text{in}}$ | Input channels (e.g. 3 for RGB) | `int` |
 | $H, W$ | **Raw image** spatial dimensions (NOT patch grid) | `int` |
 | $D$ | Model channel dim after stem | `int` |
-| $n$ | `n_per_axis` for Warped DOST | `int` |
+| $n$ | `n_per_axis` for Warped DOST. Constrained: $n \ge 3$, and $n \le N/2 + 2$ for every spatial axis length $N$ (so pick $n$ from the smallest resolution the model must handle; 6–8 typical) | `int` |
 | $D' = D \cdot n^2$ | Channel dim after DOST (2D case) | `int` |
 | $L$ | Number of HSS blocks | `int` |
 | $\Phi$ | 2D Warped DOST operator | non-learnable |
