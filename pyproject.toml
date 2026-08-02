@@ -44,11 +44,25 @@ torch = [
     {version = "2.10.0+cu130", source = "pytorch-cu130", markers = "extra!='cpu' and extra!='cu126' and extra!='cu128' and extra=='cu130'"}
 ]
 numpy = "^2.4.3"
+# ypsilon-torch — DEVELOPMENT configuration.
+#
+# Local path + develop = true, so edits in ../ypsilon-torch take effect here
+# immediately without a tag-and-bump round trip. This is what makes it
+# possible to fix an upstream defect and re-run s9's tests in one pass.
+#
+# REVERT TO THE GIT PIN BEFORE RELEASING. A path dependency is not
+# installable by anyone who does not have the sibling checkout, so a release
+# made from this state is broken for every consumer. The pinned form is:
+#
+#   {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "vX.Y.Z", extras = [...], markers = [...]}
+#
+# (the four-way extras/markers split below mirrors the torch entry above:
+#  cpu / cu126 / cu128 / cu130)
 ypsilon-torch = [
-    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.1.0", extras = ["cpu"], markers = "extra=='cpu' and extra!='cu126' and extra!='cu128' and extra!='cu130'"},
-    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.1.0", extras = ["cu126"], markers = "extra!='cpu' and extra=='cu126' and extra!='cu128' and extra!='cu130'"},
-    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.1.0", extras = ["cu128"], markers = "extra!='cpu' and extra!='cu126' and extra=='cu128' and extra!='cu130'"},
-    {git = "https://github.com/newsniper-org/ypsilon-torch", rev = "v1.1.0", extras = ["cu130"], markers = "extra!='cpu' and extra!='cu126' and extra!='cu128' and extra=='cu130'"}
+    {path = "../ypsilon-torch", develop = true, extras = ["cpu"], markers = "extra=='cpu' and extra!='cu126' and extra!='cu128' and extra!='cu130'"},
+    {path = "../ypsilon-torch", develop = true, extras = ["cu126"], markers = "extra!='cpu' and extra=='cu126' and extra!='cu128' and extra!='cu130'"},
+    {path = "../ypsilon-torch", develop = true, extras = ["cu128"], markers = "extra!='cpu' and extra!='cu126' and extra=='cu128' and extra!='cu130'"},
+    {path = "../ypsilon-torch", develop = true, extras = ["cu130"], markers = "extra!='cpu' and extra!='cu126' and extra!='cu128' and extra=='cu130'"}
 ]
 
 [tool.poetry.extras]

@@ -1472,7 +1472,7 @@ python-versions = ">=3.12,<3.15"
 groups = ["main"]
 markers = "extra == \"cpu\" and extra != \"cu126\" and extra != \"cu128\" and extra != \"cu130\" or extra == \"cu126\" and extra != \"cpu\" and extra != \"cu128\" and extra != \"cu130\" or extra == \"cu128\" and extra != \"cpu\" and extra != \"cu126\" and extra != \"cu130\" or extra == \"cu130\" and extra != \"cpu\" and extra != \"cu126\" and extra != \"cu128\""
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 numpy = "^2.4.2"
@@ -1496,10 +1496,8 @@ cu128 = ["torch (==2.10.0+cpu)", "torch (==2.10.0+cu126)", "torch (==2.10.0+cu12
 cu130 = ["torch (==2.10.0+cpu)", "torch (==2.10.0+cu126)", "torch (==2.10.0+cu128)", "torch (==2.10.0+cu130)", "torchutils[cpu] @ git+https://github.com/newsniper-org/torchutils@v0.1.1", "torchutils[cu126] @ git+https://github.com/newsniper-org/torchutils@v0.1.1", "torchutils[cu128] @ git+https://github.com/newsniper-org/torchutils@v0.1.1", "torchutils[cu130] @ git+https://github.com/newsniper-org/torchutils@v0.1.1"]
 
 [package.source]
-type = "git"
-url = "https://github.com/newsniper-org/ypsilon-torch"
-reference = "v1.1.0"
-resolved_reference = "47b6622b1088748a6187021a46002f63c60f8f36"
+type = "directory"
+url = "../ypsilon-torch"
 
 [extras]
 cpu = ["torch", "torch", "torch", "torch", "ypsilon-torch", "ypsilon-torch", "ypsilon-torch", "ypsilon-torch"]
@@ -1511,4 +1509,4 @@ h9 = []
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <3.15"
-content-hash = "cd292900ea080a574afd84a42de7a0670537da2f9d1a13d66b97f2253e95b736"
+content-hash = "c11df7eeedb6ad9ba041baff9fb8b6ccecadcc58af2116d01634ff1ec3092472"
