@@ -12,4 +12,4 @@ except:
 
 from ypsilon_torch import NonLearnableProcessorBase, NonLearnableSynchronizedProcessorBase, FPDTypeIdx, FLOAT_DTYPES_DICT, COMPLEX_DTYPES_DICT, EXPERIMENTAL_DTYPE_IDXS, get_complex_dtype, get_float_dtype
 
-from ypsilon_torch.blocks.activations import ComplexActivationFunctionBase, RealActivationFunctionBase
+from ypsilon_torch.blocks.activations import ComplexActivationFunctionBase, RealActivationFunctionBase, BiasedComplexActivationFunctionBase

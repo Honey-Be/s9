@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 from s9.examples import BiaffineS9ClassifierModelExample
 from ypsilon_torch.blocks.transforms.real_complex.dost import DOST, IDOST
+from ypsilon_torch.blocks.transforms.real_complex.sst import SynchronizedGenericSST
+
 import pytest
 
 from typing import Literal

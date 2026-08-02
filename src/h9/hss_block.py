@@ -16,7 +16,7 @@ No spatial mixing — all weights are channel-only.
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Literal, Callable
 
 import torch
 from torch import Tensor, nn
@@ -71,6 +71,11 @@ class HSSBlock(nn.Module):
         dtype_idx: FPDTypeIdx = 64,
     ) -> None:
         super().__init__()
+        if gen_activation is None:
+            gen_activation = StableModReLU
+        if gen_gate_activation is None:
+            gen_gate_activation = nn.Sigmoid
+
         self.d_model = d_model
         self.n_per_axis = n_per_axis
         self.spatial_dims = spatial_dims

@@ -5,11 +5,11 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from s9.base import ComplexActivationFunctionBase, FPDTypeIdx, FLOAT_DTYPES_DICT
+from s9.base import BiasedComplexActivationFunctionBase, FPDTypeIdx, FLOAT_DTYPES_DICT
 from s9.quantization.quantizers import fake_quant
 
 
-class PolarStableModReLU(ComplexActivationFunctionBase):
+class PolarStableModReLU(BiasedComplexActivationFunctionBase):
     """StableModReLU variant with polar decomposition + per-component quantization.
 
     Input complex is decomposed into (r, theta), each quantized to 8-bit
